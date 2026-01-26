@@ -106,8 +106,11 @@ class OrientedMap:
     Map on oriented surface.
 
     EXAMPLES::
-
+    
         sage: from topsurf import OrientedMap
+        
+    Initialized with a string::
+        
         sage: OrientedMap(vp="(0,~0)")
         OrientedMap("(0,~0)", "(0)(~0)")
 
@@ -117,40 +120,56 @@ class OrientedMap:
 
         sage: OrientedMap(vp="(0,1)", edge_like=False)
         OrientedMap("(0,~0)", "(0)(~0)")
+
+    Initialized with a list of integer::
+
+        sage: OrientedMap(vp=[1,0])
+        OrientedMap("(0,~0)", "(0)(~0)")
+
+    Initialized with a list of cycles (not mentioned elements are considered to be fixed
+    point)::
+
+        sage: OrientedMap(vp=[[0,1]])
+        OrientedMap("(0,~0)", "(0)(~0)")
+
+    In cycle notation, if an half-edge is not mentionned then the corresponding edge is folded::
+
+        sage: OrientedMap(vp="(0,1)(~0)")
+        OrientedMap("(0,1)(~0)", "(0,~0,1)")
+        sage: OrientedMap(vp="(0,1)")
+        OrientedMap("(0,1)", "(0,1)")
+        sage: OrientedMap(vp=[[0,2],[1]])
+        OrientedMap("(0,1)(~0)", "(0,~0,1)")
+
+    In list notation,  an half-edge sent to -1 corresponds to a folded edge::
+
+        sage: OrientedMap(vp=[2,1,0,-1])
+        OrientedMap("(0,1)(~0)", "(0,~0,1)")
     """
     __slots__ = ['_vp', '_fp', '_mutable']
 
-    def __init__(self, vp=None, fp=None, edge_like=True, partial=True, ne=None, alloc=None, mutable=False, check=True):
+    def __init__(self, vp=None, fp=None, edge_like=True, mutable=False, check=True):
         if vp is None and fp is None:
             raise ValueError("either the vertex permutation vp or the face permutation fp must be provided")
 
         if vp is not None:
-            if ne is not None:
-                vp = perm_init(vp, 2 * ne, partial=partial, edge_like=edge_like)
-            else:
-                vp = perm_init(vp, partial=partial, edge_like=edge_like)
+            vp = perm_init(vp, partial=True, edge_like=edge_like)
+            if len(vp) % 2 == 1:
+                vp.append(-1)
 
         if fp is not None:
-            if ne is not None:
-                fp = perm_init(fp, 2 * ne, partial=partial, edge_like=edge_like)
-            else:
-                fp = perm_init(fp, partial=partial, edge_like=edge_like)
+            fp = perm_init(fp, partial=True, edge_like=edge_like)
+            if len(fp) % 2 == 1:
+                fp.append(-1)
 
-        if ne is not None:
-            if not isinstance(ne, numbers.Integral):
-                raise TypeError(f"ne (of type {type(ne)}) must me an integer")
-            ne = int(ne)
-            if ne < 0:
-                raise ValueError(f"ne (={ne}) must be a non-negative integer")
+        if vp is not None:
+            if len(vp) % 2 != 0:
+                raise ValueError("the vertex permutation vp must have even length")
+            ne = len(vp) // 2
         else:
-            if vp is not None:
-                if len(vp) % 2 != 0:
-                    raise ValueError("the vertex permutation vp must have even length")
-                ne = len(vp) // 2
-            else:
-                if len(fp) % 2 != 0:
-                    raise ValueError("the face permutation fp must have even length")
-                ne = len(fp) // 2
+            if len(fp) % 2 != 0:
+                raise ValueError("the face permutation fp must have even length")
+            ne = len(fp) // 2
 
         if vp is None:
             vp = self._vp = array('i', [-1] * (2 * ne))
@@ -227,16 +246,6 @@ class OrientedMap:
         for h in range(2 * ne):
             if self._vp[h] != -1 and self._fp[self._ep(self._vp[h])] != h:
                 raise error(f"fev relation not satisfied at half-edge h={self._half_edge_string(h)}")
-
-    def _check_alloc(self, n):
-        if len(self._vp) < n or len(self._ep) < n or len(self._fp) < n:
-            raise TypeError("reallocation needed")
-
-    def _realloc(self, n_max):
-        if n_max < self._n:
-            return
-        self._vp.extend([-1] * (n_max - self._n))
-        self._fp.extend([-1] * (n_max - self._n))
 
     def __getstate__(self):
         a = [self._mutable]
@@ -973,7 +982,7 @@ class OrientedMap:
                     vp[h] = h_image
 
         assert perm_check(vp)
-        return OrientedMap(vp=vp, mutable=mutable, edge_like=False, partial=True, check=check)
+        return OrientedMap(vp=vp, mutable=mutable, check=check)
 
     def connected_components_submaps(self, relabel=False, mutable=False):
         r"""
@@ -2254,6 +2263,81 @@ class OrientedMap:
             return (True, perm_compose(r1, perm_invert(r2)))
         else:
             return True
+
+    def dual(self, mutable=None, check=True):
+        r"""
+        Return the dual map of self. 
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: G = OrientedMap(vp=[[0,1,2,3]])
+            sage: G
+            OrientedMap("(0,~0,1,~1)", "(0)(~0,~1)(1)")
+            sage: G.dual()
+            OrientedMap("(0,1)(~0)(~1)", "(0,~0,1,~1)")
+            
+            sage: H = OrientedMap(vp=[[0,2,1,3]])
+            sage: H.dual()
+            OrientedMap("(0,1,~0,~1)", "(0,1,~0,~1)")
+            sage: H == H.dual()
+            True
+
+            sage: I = OrientedMap(vp=[2,1,0,-1])
+            sage: I
+            OrientedMap("(0,1)(~0)", "(0,~0,1)")
+            sage: I.dual()
+            OrientedMap("(0,1,~0)", "(0,1)(~0)")
+
+        Applying four times the dual function return the same map (with same labels)::
+        
+            sage: G0 = OrientedMap(vp=[[0,1,2,3]])
+            sage: G1 = G0.dual()
+            sage: G2 = G1.dual()
+            sage: G3 = G2.dual()
+            sage: G4 = G3.dual()
+            sage: G4 == G0
+            True
+            sage: G2 == G0
+            False
+
+        """
+        if check:
+            self._check()
+        if mutable==None:
+            mutable=self._mutable
+        return OrientedMap(fp=self._vp,mutable=mutable)
+
+
+    def smoothing(self, h1, h2=None, check=2):
+        if check:
+            self._assert_mutable()
+            self._check_half_edge(h1)
+            if h1 == h2:
+                raise ValueError("cannot smooth vertex with the same corner")
+            if h2 != None:
+                self._check_half_edge(h2)
+            #TODO check if h2 and h1 are on the same vertex ?
+
+        if h2 == None:
+            n = 1
+            cur = self._vp[h1]
+            while cur != h1:
+                cur = self._vp[cur]
+                n+=1
+            if n%2 == 1:
+                raise ValueError("can only smooth an even degree vertex with only h1")
+            n1 = n//2
+            h2 = h1
+            for _ in range(n1):
+                h2 = self._vp[h2]
+            
+        h3 = self._vp[h2]
+        h4 = self._vp[h1]
+        self._vp[h1] = h3
+        self._vp[h2] = h4
+        self._fp[self._ep(h3)] = h1        
+        self._fp[self._ep(h4)] = h2
 
 
 # - relabel: keep combinatorics but change labellings
