@@ -123,48 +123,53 @@ class OrientedMap:
 
     Initialized with a list of integer::
 
-        sage: OrientedMap([1,0])
+        sage: OrientedMap(vp=[1,0])
         OrientedMap("(0,~0)", "(0)(~0)")
 
     Initialized with a list of cycles (not mentioned elements are considered to be fixed
     point)::
 
-        sage: OrientedMap([[0,1]])
+        sage: OrientedMap(vp=[[0,1]])
         OrientedMap("(0,~0)", "(0)(~0)")
+
+    In cycle notation, if an half-edge is not mentionned then it is fold::
+
+        sage: OrientedMap(vp="(0,1)(~0)")
+        OrientedMap("(0,1)(~0)", "(0,~0,1)")
+        sage: OrientedMap(vp="(0,1)")
+        OrientedMap("(0,1)", "(0,1)")
+        sage: OrientedMap(vp=[[0,2],[1]])
+        OrientedMap("(0,1)(~0)", "(0,~0,1)")
+
+    In list notation, an half-edge send to -1 is fold::
+
+        sage: OrientedMap(vp=[2,1,0,-1])
+        OrientedMap("(0,1)(~0)", "(0,~0,1)")
     """
     __slots__ = ['_vp', '_fp', '_mutable']
 
-    def __init__(self, vp=None, fp=None, edge_like=True, partial=True, ne=None, alloc=None, mutable=False, check=True):
+    def __init__(self, vp=None, fp=None, edge_like=True, mutable=False, check=True):
         if vp is None and fp is None:
             raise ValueError("either the vertex permutation vp or the face permutation fp must be provided")
 
         if vp is not None:
-            if ne is not None:
-                vp = perm_init(vp, 2 * ne, partial=partial, edge_like=edge_like)
-            else:
-                vp = perm_init(vp, partial=partial, edge_like=edge_like)
+            vp = perm_init(vp, partial=True, edge_like=edge_like)
+            if len(vp) % 2 == 1:
+                vp.append(-1)
 
         if fp is not None:
-            if ne is not None:
-                fp = perm_init(fp, 2 * ne, partial=partial, edge_like=edge_like)
-            else:
-                fp = perm_init(fp, partial=partial, edge_like=edge_like)
+            fp = perm_init(fp, partial=True, edge_like=edge_like)
+            if len(fp) % 2 == 1:
+                fp.append(-1)
 
-        if ne is not None:
-            if not isinstance(ne, numbers.Integral):
-                raise TypeError(f"ne (of type {type(ne)}) must me an integer")
-            ne = int(ne)
-            if ne < 0:
-                raise ValueError(f"ne (={ne}) must be a non-negative integer")
+        if vp is not None:
+            if len(vp) % 2 != 0:
+                raise ValueError("the vertex permutation vp must have even length")
+            ne = len(vp) // 2
         else:
-            if vp is not None:
-                if len(vp) % 2 != 0:
-                    raise ValueError("the vertex permutation vp must have even length")
-                ne = len(vp) // 2
-            else:
-                if len(fp) % 2 != 0:
-                    raise ValueError("the face permutation fp must have even length")
-                ne = len(fp) // 2
+            if len(fp) % 2 != 0:
+                raise ValueError("the face permutation fp must have even length")
+            ne = len(fp) // 2
 
         if vp is None:
             vp = self._vp = array('i', [-1] * (2 * ne))
