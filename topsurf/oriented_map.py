@@ -106,8 +106,11 @@ class OrientedMap:
     Map on oriented surface.
 
     EXAMPLES::
-
+    
         sage: from topsurf import OrientedMap
+        
+    Initialized with a string::
+        
         sage: OrientedMap(vp="(0,~0)")
         OrientedMap("(0,~0)", "(0)(~0)")
 
@@ -116,6 +119,17 @@ class OrientedMap:
     ``edge_like=False`` option::
 
         sage: OrientedMap(vp="(0,1)", edge_like=False)
+        OrientedMap("(0,~0)", "(0)(~0)")
+
+    Initialized with a list of integer::
+
+        sage: OrientedMap([1,0])
+        OrientedMap("(0,~0)", "(0)(~0)")
+
+    Initialized with a list of cycles (not mentioned elements are considered to be fixed
+    point)::
+
+        sage: OrientedMap([[0,1]])
         OrientedMap("(0,~0)", "(0)(~0)")
     """
     __slots__ = ['_vp', '_fp', '_mutable']

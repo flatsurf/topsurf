@@ -292,7 +292,7 @@ def perm_init(data, int n=-1, edge_like=False, partial=False):
             else:
                 return array.array('i', [])
         elif isinstance(data[0], (tuple, list)):
-            return perm_from_cycles(data, n=n, edge_like=edge_like, partial=partial)
+            return perm_from_cycles(data, n=n, edge_like=False, partial=partial)
         elif n == -1 or (len(data) == n):
             return array.array('i', data)
         else:
@@ -301,13 +301,6 @@ def perm_init(data, int n=-1, edge_like=False, partial=False):
     if isinstance(data, str):
         c = str_to_cycles(data)
         return perm_from_cycles(c, n=n, edge_like=edge_like, partial=partial)
-
-    # TODO: test flipper conversion
-    if data.__module__.startswith('flipper'):
-        from .misc import flipper_isometry_to_perm
-        return flipper_isometry_to_perm(data)
-
-    raise TypeError("The input must be list, tuple or string")
 
 
 def perm_from_cycles(t, int n=-1, edge_like=False, partial=False):
