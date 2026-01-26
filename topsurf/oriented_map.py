@@ -2264,6 +2264,51 @@ class OrientedMap:
         else:
             return True
 
+    def dual(self, mutable=None, check=True):
+        r"""
+        Return the dual map of self. 
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: G = OrientedMap(vp=[[0,1,2,3]])
+            sage: G
+            OrientedMap("(0,~0,1,~1)", "(0)(~0,~1)(1)")
+            sage: G.dual()
+            OrientedMap("(0,1)(~0)(~1)", "(0,~0,1,~1)")
+            
+            sage: H = OrientedMap(vp=[[0,2,1,3]])
+            sage: H.dual()
+            OrientedMap("(0,1,~0,~1)", "(0,1,~0,~1)")
+            sage: H == H.dual()
+            True
+
+            sage: I = OrientedMap(vp=[2,1,0,-1])
+            sage: I
+            OrientedMap("(0,1)(~0)", "(0,~0,1)")
+            sage: I.dual()
+            OrientedMap("(0,1,~0)", "(0,1)(~0)")
+
+        Applying four times the dual function return the same map (with same labels)::
+        
+            sage: G0 = OrientedMap(vp=[[0,1,2,3]])
+            sage: G1 = G0.dual()
+            sage: G2 = G1.dual()
+            sage: G3 = G2.dual()
+            sage: G4 = G3.dual()
+            sage: G4 == G0
+            True
+            sage: G2 == G0
+            False
+
+        """
+        if check:
+            self._check()
+        if mutable==None:
+            mutable=self._mutable
+        return OrientedMap(fp=self._vp,mutable=mutable)
+        
+
 
 # - relabel: keep combinatorics but change labellings
 # - slide or half_edge_slide (possibly flip as a shortcut)
