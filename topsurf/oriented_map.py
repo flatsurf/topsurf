@@ -351,6 +351,15 @@ class OrientedMap:
         if h >= 0 and self._vp[h] == -1:
             raise ValueError(f"invalid half-edge (={h}); the underlying edge is folded")
 
+    def _check_half_edge_folded(self, h):
+        if not isinstance(h, numbers.Integral):
+            raise TypeError(f"invalid half-edge {h} of type {type(h).__name__}")
+        h = int(h)
+        if h < 0 or h >= len(self._vp):
+            raise ValueError(f"half-edge number out of range (={h})")
+        if self._ep(h) == 0:
+            raise ValueError(f"the edge corresponding to {h} is folded")
+    
     def _check_edge(self, e):
         if not isinstance(e, numbers.Integral):
             raise TypeError(f"invalid edge {e}")
@@ -2309,35 +2318,61 @@ class OrientedMap:
         return OrientedMap(fp=self._vp,mutable=mutable)
 
 
-    def smoothing(self, h1, h2=None, check=2):
+    def smoothing(self, h, check=True):
+        r"""
+        Smooth the 4-degree vertex corresponding to h in the direction of h.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: G = OrientedMap(vp=[[0, 2, 4, 6], [1], [3], [5], [7]], mutable=True)
+            sage: G.smoothing(0)
+            sage: G
+            OrientedMap("(0)(~0)(1)(~1)", "(0,~0)(1,~1)")
+            sage: H = OrientedMap(vp=[[0, 2, 4, 6], [1, 8], [3, 9], [5, 10], [7, 11]], mutable=True)
+            sage: H.smoothing(0)
+            sage: H
+            OrientedMap("(0,~5)(~0,4)(1,5)(~1,~4)", "(0,4,~1,5)(~0,~5,1,~4)")
+
+        """
+
+        
         if check:
             self._assert_mutable()
-            self._check_half_edge(h1)
-            if h1 == h2:
-                raise ValueError("cannot smooth vertex with the same corner")
-            if h2 != None:
-                self._check_half_edge(h2)
-            #TODO check if h2 and h1 are on the same vertex ?
+            self._check_half_edge(h)
 
-        if h2 == None:
-            n = 1
-            cur = self._vp[h1]
-            while cur != h1:
-                cur = self._vp[cur]
-                n+=1
-            if n%2 == 1:
-                raise ValueError("can only smooth an even degree vertex with only h1")
-            n1 = n//2
-            h2 = h1
-            for _ in range(n1):
-                h2 = self._vp[h2]
-            
+        h1 = self._vp[h]
+        h2 = self._vp[h1]
         h3 = self._vp[h2]
-        h4 = self._vp[h1]
-        self._vp[h1] = h3
-        self._vp[h2] = h4
-        self._fp[self._ep(h3)] = h1        
-        self._fp[self._ep(h4)] = h2
+        if h==h1 or h==h2 or h==h3 or h!=self._vp[h3]:
+            raise ValueError("the case of vertex of degree other than 4 is not implemented yet")
+        self._check_half_edge_folded(h)
+        self._check_half_edge_folded(h1)
+        self._check_half_edge_folded(h2)
+        self._check_half_edge_folded(h3)
+
+        oh = self._ep(h)
+        oh1 = self._ep(h1)
+        oh2 = self._ep(h2)
+        oh3 = self._ep(h3)
+        
+        self._vp[h] = self._vp[oh3] if self._vp[oh3] != oh3 else h
+        self._vp[h1] = self._vp[oh2] if self._vp[oh2] != oh2 else h1
+        self._vp[self._fp[h3]] = h
+        self._vp[self._fp[h2]] = h1
+        self._vp[oh3] = -1
+        self._vp[oh2] = -1
+        self._vp[h2] = -1
+        self._vp[h3] = -1
+        
+        self._fp[oh] = self._fp[h3]
+        self._fp[oh1] = self._fp[h2]
+        self._fp[self._ep(self._vp[h])] = h
+        self._fp[self._ep(self._vp[h1])] = h1
+        self._fp[h2] = -1
+        self._fp[h3] = -1
+        self._fp[oh2] = -1
+        self._fp[oh3] = -1
 
 
 # - relabel: keep combinatorics but change labellings
