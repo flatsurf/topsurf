@@ -2438,9 +2438,7 @@ class OrientedMap:
             sage: J.smoothing(2)
             sage: J
             OrientedMap("(1)(~1)", "(1,~1)")
-
         """
-
         
         if check:
             self._assert_mutable()
@@ -2483,6 +2481,62 @@ class OrientedMap:
 
         remove_trailing_minus_ones(self._fp)
         remove_trailing_minus_ones(self._vp)
+        
+    def disjoint_union(self, *others, check=True):
+        r"""
+        Add a copy of others in self. The labels of the half edges of others will be shifted by the sizes of the previous maps.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: M = OrientedMap(vp=[1, 0], mutable=True)
+            sage: edge = OrientedMap(vp=[0, 1])
+            sage: triangle = OrientedMap(vp=[3, 4, 5, 0, 1, 2])
+            sage: M.disjoint_union(edge, triangle)
+            sage: M
+            OrientedMap("(0,~0)(1)(~1)(2,~3)(~2,4)(3,~4)", "(0)(~0)(1,~1)(2,4,3)(~2,~3,~4)")
+        """
+
+        if check:
+            self._assert_mutable()
+            self._check()
+            for m in others:
+                m._check()
+        
+        for m in others:
+            n = len(self._vp)
+            for h in range(len(m._vp)):
+                self._vp.append(m._vp[h]+n)
+                self._fp.append(m._fp[h]+n)
+
+    
+    def merge_vertices(self, *corners, check=True):
+        r"""
+        Merges the corners in corners.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: M = OrientedMap(vp=[0, 2, 1, 4, 3, 5], mutable=True)
+            sage: M
+            OrientedMap("(0,~0,1,~2)(~1,2)", "(0)(~0,~2,~1)(1,2)")
+        """
+
+        if check:
+            self._assert_mutable()
+            self._check()
+
+        for i in range(len(corners)-1):
+            c0 = corners[i]
+            c1 = corners[i+1]
+            nv0 = self.next_at_vertex(c0)
+            nv1 = self.next_at_vertex(c1)
+            nf0 = self.previous_in_face(c0)
+            nf1 = self.previous_in_face(c1)
+            self._vp[c0] = nv1
+            self._vp[c1] = nv0
+            self._fp[nf1] = c0
+            self._fp[nf0] = c1
 
 # - relabel: keep combinatorics but change labellings
 # - slide or half_edge_slide (possibly flip as a shortcut)
