@@ -39,6 +39,7 @@ from topsurf.permutation import (perm_init, perm_check, perm_cycles, perm_on_arr
                           perm_cycles_to_string, perm_on_list, perm_on_edge_list, perm_cycle_type,
                           perm_num_cycles, str_to_cycles, str_to_cycles_and_data, perm_compose, perm_from_base64_str,
                           uint_base64_str, uint_from_base64_str, perm_base64_str,
+                          perm_orbit, perm_orbit_size,
                           perms_are_transitive, perms_orbits, perm_edge_orbits, edge_relabelling_from, array_hash)
 
 
@@ -973,6 +974,9 @@ class OrientedMap:
         """
         return perm_cycles(self._vp, True)
 
+    def vertex_profile(self):
+        return sorted(perm_cycles_lengths(self._vp), reverse=True)
+
     def num_vertices(self):
         r"""
         Return the number of vertices.
@@ -1002,6 +1006,9 @@ class OrientedMap:
         """
         return perm_cycles(self._fp, True)
 
+    def face_profile(self):
+        return sorted(perm_cycles_lengths(self._fp), reverse=True)
+
     def num_faces(self):
         r"""
         Return the number of faces.
@@ -1017,44 +1024,38 @@ class OrientedMap:
         """
         return perm_num_cycles(self._fp)
 
-    def vertex_degree(self, h):
+    def vertex_degree(self, h, check=True):
         r"""
-        Return the degree of the vertex incident to h.
+        Return the degree of the vertex incident to the half-edge ``h``.
 
         EXAMPLES::
+
+            sage: from topsurf import OrientedMap
 
             sage: m = OrientedMap(vp="(0,1,2)(3,4,5)(~0,~3,6)")
             sage: m.vertex_degree(2)
             3
         """
-        self._check_half_edge(h)
-        n = 1
-        cur = self._vp[h]
-        while cur != h:
-            cur = self._vp[cur]
-            n += 1
-        return n
+        if check:
+            self._check_half_edge(h)
+        return perm_orbit_size(self._vp, h)
 
-
-    def face_degree(self, h):
+    def face_degree(self, h, check=True):
         r"""
-        Return the degree of the face incident to h.
-        
+        Return the degree of the face incident to the half-edge ``h``.
+
         EXAMPLES::
+
+            sage: from topsurf import OrientedMap
 
             sage: m = OrientedMap(vp="(0,1,2)(3,4,5)(~0,~3,6)")
             sage: m.face_degree(2)
             9
         """
-        self._check_half_edge(h)
-        n = 1
-        cur = self._fp[h]
-        while cur != h:
-            cur = self._fp[cur]
-            n += 1
-        return n
+        if check:
+            self._check_half_edge(h)
+        return perm_orbit_size(self._fp, h)
 
-    
     def is_connected(self):
         r"""
         Return whether the constellation is connected.
