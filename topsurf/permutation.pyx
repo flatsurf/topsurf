@@ -1549,6 +1549,68 @@ def perm_conjugate(array.array p1, array.array p2, int n=-1):
             res.data.as_ints[p2.data.as_ints[i]] = p2.data.as_ints[p1.data.as_ints[i]]
     return res
 
+
+def perm_conjugate_transposition_inplace(array.array p, int i, int j, int pi_inv=-1, int pj_inv=-1, int n=-1):
+    if n == -1:
+        n = len(p)
+    if len(p) < n:
+        raise ValueError("invalid input")
+    if i < 0 or i >= n:
+        raise ValueError(f"i (={i}) out of range")
+    if j < 0 or j >= n:
+        raise ValueError(f"j (={j}) out of range")
+
+    cdef int pi = p.data.as_ints[i]
+    cdef int pj = p.data.as_ints[j]
+
+    if pi_inv == -1:
+        pi_inv = perm_preimage(p, i)
+    elif pi_inv < 0 or pi_inv >= n:
+        raise ValueError(f"pi_inv (={pi_inv}) out of range")
+    elif p.data.as_ints[pi_inv] != i:
+        raise ValueError(f"invalid input: pi_inv={pi_inv} mapped to {p.data.as_ints[pi_inv]} and not i={i}")
+
+    if pj_inv == -1:
+        pj_inv = perm_preimage(p, j)
+    elif pj_inv < 0 or pj_inv >= n:
+        raise ValueError(f"pj_inv (={pj_inv}) out of range")
+    elif p.data.as_ints[pj_inv] != j:
+        raise ValueError(f"invalid input: pj_inv={pj_inv} mapped to {p.data.as_ints[pj_inv]} and not j={j}")
+
+    if p.data.as_ints[i] == j and p.data.as_ints[j] == i:
+        #  ij)
+        pass
+    elif p.data.as_ints[i] == j:
+        # (.ij.)
+        p.data.as_ints[pi_inv] = j
+        p.data.as_ints[j] = i
+        p.data.as_ints[i] = pj
+    elif p.data.as_ints[j] == i:
+        # (.ji.)
+        p.data.as_ints[pj_inv] = i
+        p.data.as_ints[i] = j
+        p.data.as_ints[j] = pi
+    else:
+        if pi == i:
+            # (i)
+            p.data.as_ints[j] = j
+        else:
+            # (.i.)
+            assert pi_inv != j
+            assert pi != j
+            p.data.as_ints[pi_inv] = j
+            p.data.as_ints[j] = pi
+
+        if pj == j:
+            # (j)
+            p.data.as_ints[i] = i
+        else:
+            # (.j.)
+            assert pj_inv != i
+            assert pj != i
+            p.data.as_ints[pj_inv] = i
+            p.data.as_ints[i] = pj
+
 #####################################################################
 # Transitivity test
 #####################################################################
