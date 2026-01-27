@@ -3,13 +3,13 @@ import pytest
 def test_constructor():
     from topsurf import OrientedMap
 
-    OrientedMap([2, 1, 3, 0], None, edge_like=False)
-    OrientedMap(None, [2, 1, 3, 0], edge_like=False)
-    OrientedMap([0, -1, 3, 4, 5, 2], None, edge_like=False)
-    OrientedMap(None, [0, -1, 3, 4, 5, 2], edge_like=False)
+    OrientedMap([2, 1, 3, 0], None)
+    OrientedMap(None, [2, 1, 3, 0])
+    OrientedMap([0, -1, 3, 4, 5, 2])
+    OrientedMap(None, [0, -1, 3, 4, 5, 2])
 
-    OrientedMap([0, -1, 3, 4, 5, 2], None, edge_like=False)
-    OrientedMap(None, [0, -1, 3, 4, 5, 2], edge_like=False)
+    OrientedMap([0, -1, 3, 4, 5, 2], None)
+    OrientedMap(None, [0, -1, 3, 4, 5, 2])
 
     OrientedMap("(0,1,2)(~0,~1,~2)", None)
     OrientedMap(None, "(0,1,2)(~0,~1,~2)")
@@ -45,10 +45,11 @@ def test_check_edge():
     from topsurf import OrientedMap
 
     assert OrientedMap(fp="(0,1,~1)")._check_edge(0) == 0
+    assert OrientedMap(fp="(0,1,~1)")._check_edge(1) == 1
 
     with pytest.raises(ValueError):
         OrientedMap(fp="(0,1,~1)")._check_edge(-1)
-    
+
     with pytest.raises(ValueError):
         OrientedMap("(0,1,~1)")._check_edge(2)
 
@@ -165,8 +166,125 @@ def test_copy():
         assert not m3.is_mutable()
 
 
-def test_swap():
+def small_maps(folded=True):
     from topsurf import OrientedMap
 
+    if folded:
+        yield OrientedMap("(0)")
+
+    yield OrientedMap("(0,~0)")
+    yield OrientedMap("(0)(~0)")
+
+    if folded:
+        yield OrientedMap("(0,1)")
+        yield OrientedMap("(0)(~0,1)")
+        yield OrientedMap("(~0)(0,1)")
+        yield OrientedMap("(1)(0,~1)")
+        yield OrientedMap("(~1)(0,1)")
+        yield OrientedMap("(0,1,~1)")
+        yield OrientedMap("(0,~1,1)")
+        yield OrientedMap("(0,~0,1)")
+        yield OrientedMap("(0,1,~0)")
+
+    yield OrientedMap("(0,1)(~0)(~1)")
+    yield OrientedMap("(~0,1)(0)(~1)")
+    yield OrientedMap("(0,~1)(~0)(1)")
+    yield OrientedMap("(~0,~1)(0)(1)")
+
+    yield OrientedMap("(0,1,~1)(~0)")
+
+    yield OrientedMap("(0,~0,1,~1)")
+    yield OrientedMap("(0,~0,~1,1)")
+    yield OrientedMap("(0,1,~0,~1)")
+    yield OrientedMap("(0,1,~1,~0)")
+    yield OrientedMap("(0,~1,~0,1)")
+    yield OrientedMap("(0,~1,1,~0)")
 
 
+def test_contract_edge():
+    from topsurf import OrientedMap
+
+    for m in small_maps():
+        for e in m.edges():
+            mm = m.copy(mutable=True)
+            mm.contract_edge(e)
+            mm._check()
+            assert mm.num_edges() == m.num_edges() - 1
+
+
+def test_add_edge_delete_edge():
+    from topsurf import OrientedMap
+
+    m = OrientedMap("", "", mutable=True)
+
+    m.add_edge(-1, -1)
+    m._check()
+    assert m == OrientedMap("(0,~0)", "(0)(~0)")
+
+    m.add_edge(-1, -2)
+    m._check()
+    assert m == OrientedMap("(0,~0)(1)(~1)", "(0)(~0)(1,~1)")
+
+    m.add_edge(0, -1)
+    m._check()
+    assert m == OrientedMap("(0,2,~0)(1)(~1)(~2)", "(0,2,~2)(~0)(1,~1)")
+
+    m.add_edge(-1, 0)
+    m._check()
+    assert m == OrientedMap("(0,~3,2,~0)(1)(~1)(~2)(3)", "(0,2,~2,~3,3)(~0)(1,~1)")
+
+    m.add_edge(1, 1)
+    m._check()
+    assert m == OrientedMap("(0,~3,2,~0,4,~4)(1)(~1)(~2)(3)", "(0,2,~2,~3,3)(~0,~4)(1,~1)(4)")
+
+    m.add_edge(0, 2)
+    m._check()
+    assert m == OrientedMap("(0,5,~3,2,~0,4,~4)(1,~5)(~1)(~2)(3)", "(0,2,~2,~3,3,5,1,~1,~5)(~0,~4)(4)")
+
+    m.delete_edge(5)
+    m._check()
+    assert m == OrientedMap("(0,~3,2,~0,4,~4)(1)(~1)(~2)(3)", "(0,2,~2,~3,3)(~0,~4)(1,~1)(4)")
+
+    m.delete_edge(4)
+    m._check()
+    assert m == OrientedMap("(0,~3,2,~0)(1)(~1)(~2)(3)", "(0,2,~2,~3,3)(~0)(1,~1)")
+
+    m.delete_edge(3)
+    m._check()
+    assert m == OrientedMap("(0,2,~0)(1)(~1)(~2)", "(0,2,~2)(~0)(1,~1)")
+
+    m.delete_edge(2)
+    m._check()
+    assert m == OrientedMap("(0,~0)(1)(~1)", "(0)(~0)(1,~1)")
+
+    m.delete_edge(1)
+    m._check()
+    assert m == OrientedMap("(0,~0)", "(0)(~0)")
+
+    m.delete_edge(0)
+    m._check()
+    assert m == OrientedMap("", "")
+
+
+def test_relabel():
+    from topsurf import OrientedMap
+    from topsurf.permutation import perm_compose, perm_random_centralizer
+
+    m = OrientedMap(fp="(0,1,2)(~0,~1,~2)", mutable=True)
+    for _ in range(10):
+        r = perm_random_centralizer(m.edge_permutation())
+        m.relabel(r)
+        m._check()
+
+    fp = "(0,16,~15)(1,19,~18)(2,22,~21)(3,21,~20)(4,20,~19)(5,23,~22)(6,18,~17)(7,17,~16)(8,~1,~23)(9,~2,~8)(10,~3,~9)(11,~4,~10)(12,~5,~11)(13,~6,~12)(14,~7,~13)(15,~0,~14)"
+    m = OrientedMap(fp=fp)
+    ep = m.edge_permutation()
+    for _ in range(10):
+        p1 = perm_random_centralizer(ep)
+        p2 = perm_random_centralizer(ep)
+        m1 = m.copy(mutable=True)
+        m1.relabel(p1)
+        m1.relabel(p2)
+        m2 = m.copy(mutable=True)
+        m2.relabel(perm_compose(p1, p2))
+        assert m1  == m2

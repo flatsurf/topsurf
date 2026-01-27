@@ -253,6 +253,7 @@ class OrientedMap:
         if check:
             self._check(ValueError)
 
+
     def _half_edge_string(self, e):
         return '~%d' % (e // 2) if e % 2 else '%d' % (e // 2)
 
@@ -392,14 +393,16 @@ class OrientedMap:
             raise ValueError(f"invalid half-edge (={h}); the underlying edge is folded")
         return h
 
-    def _check_half_edge_or_minus_one(self, h):
+    def _check_half_edge_or_negative(self, h):
         if not isinstance(h, numbers.Integral):
             raise TypeError(f"invalid half-edge {h} of type {type(h).__name__}")
         h = int(h)
-        if h < -1 or h >= len(self._vp):
-            raise ValueError(f"half-edge number out of range (={h})")
-        if h >= 0 and self._vp[h] == -1:
-            raise ValueError(f"invalid half-edge (={h}); the underlying edge is folded")
+        if h >= 0:
+            if  h >= len(self._vp):
+                raise ValueError(f"half-edge number out of range (={h})")
+            if self._vp[h] == -1:
+                raise ValueError(f"invalid half-edge (={h}); the underlying edge is folded")
+        return h
 
     def _check_half_edge_folded(self, h):
         if not isinstance(h, numbers.Integral):
@@ -539,7 +542,7 @@ class OrientedMap:
 
             sage: from topsurf import OrientedMap
 
-            sage: m = OrientedMap([[0,1,2],[-1,-2,-3]], mutable=True)
+            sage: m = OrientedMap([[0,2,4],[1,3,5]], mutable=True)
             sage: s = m.copy()
             sage: s == m
             True
@@ -1101,7 +1104,29 @@ class OrientedMap:
 
         - ``connected`` -- if ``False`` return a tuple if ``True`` and non-connected raises an error
 
+
         EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: OrientedMap(fp="(0,1,2)").genus()
+            0
+            sage: OrientedMap(fp="(0,1,~0,~1)").genus()
+            1
+
+        If the map is non-connected you get an error::
+
+            sage: OrientedMap(fp="(0,~0)(1,~1)").genus()
+            Traceback (most recent call last):
+            ...
+            ValueError: non-connected map
+
+        In that case, one can obtain the genus of each connected component by setting the
+        argument ``connected`` to ``False``::
+
+            sage: OrientedMap(fp="(0,~0)(1,~1)").genus(connected=False)
+            [0, 0]
+            sage: OrientedMap(fp="(0,2,~0,~2)(1,3)(~1,~3)").genus(connected=False)
+            [1, 0]
         """
         if connected:
             if check >= 2:
@@ -1459,21 +1484,32 @@ class OrientedMap:
 
         INPUT:
 
-        -- ``h0``: integer -- half-edge. If set to ``-1`` then the newly added edge is
-           attached to a new vertex
+        -- ``h0``: integer -- ``-1`` or valid half-edge index. If set to ``-1``
+           then the newly added edge is attached to a new vertex.
 
-        -- ``h1``: integer or ``None`` -- if ``None``, then insert a half-edge in ``h0``.
-           If set to ``-1`` then the half-edge is glued to itself.
+        -- ``h1``: integer -- ``-1`` or valid half-edge index. If set to ``-1``
+           then the newly added edge is attached to a new vertex.
 
         -  `e``: integer -- an optional edge index for the newly created edge.
 
         - ``check`` -- whether to check input consistency
+
+        EXAMPLES:
+
+            sage: from topsurf import OrientedMap
+
+        We start from a torus and triangulate it by adding an edge in the middle of the face::
+
+            sage: m = OrientedMap(fp="(0,1,~0,~1)", mutable=True)
+            sage: m.add_edge(0, 1)
+            sage: m
+            OrientedMap("(0,2,1,~0,~2,~1)", "(0,1,~2)(~0,~1,2)")
         """
-        if check:
+        if check >= 1:
             self._assert_mutable()
-            h0 = self._check_half_edge_or_minus_one(h0)
+            h0 = self._check_half_edge_or_negative(h0)
             if h1 is not None:
-                h1 = self._check_half_edge_or_minus_one(h1)
+                h1 = self._check_half_edge_or_negative(h1)
 
         if e is None:
             e = len(self._vp) // 2
@@ -1496,19 +1532,74 @@ class OrientedMap:
         vp = self._vp
         fp = self._fp
 
-        h0_fp_prev = fp.previous_in_face(h0)
-        h1_fp_prev = fp.previous_in_face(h1)
+        if h0 < 0:
+            if h1 < 0:
+                if h0 == h1:
+                    # independent loop
+                    print("case 1")
+                    vp[2 * e] = 2 * e + 1
+                    vp[2 * e + 1] = 2 * e
+                    fp[2 * e] = 2 * e
+                    fp[2 * e + 1] = 2 * e + 1
+                else:
+                    # independent edge
+                    print("case 2")
+                    vp[2 * e] = 2 * e
+                    vp[2 * e + 1] = 2 * e + 1
+                    fp[2 * e] = 2 * e + 1
+                    fp[2 * e + 1] = 2 * e
+            else:
+                # edge attached only at h1
+                h1_fp_prev = self.previous_in_face(h1)
 
-        vp[2 * e] = vp[h0]
-        vp[h0] = 2 * e
+                vp[2 * e] = 2 * e
 
-        vp[2 * e + 1] = vp[h1]
-        vp[h1] = 2 * e + 1
+                vp[2 * e + 1] = vp[h1]
+                vp[h1] = 2 * e + 1
 
-        fp[h1_fp_prev] = 2 * e + 1
-        fp[2 * e + 1] = h0
-        fp[h0_fp_prev] = 2 * e
-        fp[2 * e] = h1
+                fp[h1_fp_prev] = 2 * e + 1
+                fp[2 * e + 1] = 2 * e
+                fp[2 * e] = h1
+
+        elif h1 < 0:
+            # edge attached only at h0
+            h0_fp_prev = self.previous_in_face(h0)
+            vp[2 * e + 1] = 2 * e + 1
+
+            vp[2 * e] = vp[h0]
+            vp[h0] = 2 * e
+
+            fp[h0_fp_prev] = 2 * e
+            fp[2 * e] = 2 * e + 1
+            fp[2 * e + 1] = h0
+
+        elif h0 == h1:
+            # loop at h0
+            h0_fp_prev = self.previous_in_face(h0)
+
+            vp[2 * e] = 2 * e + 1
+            vp[2 * e + 1] = vp[h0]
+            vp[h0] = 2 * e
+
+            fp[h0_fp_prev] = 2 * e + 1
+            fp[2 * e + 1] = h0
+            fp[2 * e] = 2 * e
+
+        else:
+            # edge attached at h0 and h1
+            h0_fp_prev = self.previous_in_face(h0)
+            h1_fp_prev = self.previous_in_face(h1)
+
+            vp[2 * e] = vp[h0]
+            vp[h0] = 2 * e
+
+            vp[2 * e + 1] = vp[h1]
+            vp[h1] = 2 * e + 1
+
+            fp[h1_fp_prev] = 2 * e + 1
+            fp[2 * e + 1] = h0
+            fp[h0_fp_prev] = 2 * e
+            fp[2 * e] = h1
 
     def insert_edge(self, h0, h1=None, e=None, check=2):
         r"""
@@ -1596,95 +1687,58 @@ class OrientedMap:
         vp[h] = H_vp
         vp[H] = h_vp
 
-    # TODO: clean documentation
-    # TODO: if given as cycles, can make it O(input size)
+    # TODO: if given as cycles, can we make it O(input size)?
     def relabel(self, p=None, check=True):
         r"""
-        Relabel this triangulation inplace according to the permutation ``p``.
+        Relabel this triangulation inplace.
+
+        If the permutation ``p`` is provided as argument, then it used for
+        relabelling. Otherwise, the map is relabelled so that it uses
+        consecutive integers starting at ``0`` for its edges.
 
         EXAMPLES::
 
-            sage: from veerer import Triangulation, VeeringTriangulation, StrebelGraph, BLUE, RED
+            sage: from topsurf import OrientedMap
 
-            sage: T = Triangulation("(0,1,2)(~0,~1,~2)", mutable=True)
-            sage: T.relabel("(0,~0)")
-            sage: T
-            Triangulation("(0,~1,~2)(~0,1,2)")
-            sage: T.relabel("(0,1,~2)(~0,~1,2)")
-            sage: T
-            Triangulation("(0,1,2)(~0,~1,~2)")
+            sage: m =OrientedMap("(0,5,3,~3)(~0)", "(0,~0,~3,5)(3)", mutable=True)
+            sage: m.relabel("(0,~0)")
+            sage: m
+            sage: m.relabel("(0,1,~2)(~0,~1,2)")
+            sage: m
 
-            sage: T.set_immutable()
-            sage: T.relabel("(0,~1)")
+            sage: m.set_immutable()
+            sage: m.relabel("(0,~1)")
             Traceback (most recent call last):
             ...
-            ValueError: immutable triangulation; use a mutable copy instead
 
-        An example of a flip sequence which forms a loop after non-trivial relabelling::
+        An example where ``p`` is not provided::
 
-            sage: T0 = Triangulation("(1,~0,4)(2,~4,~1)(3,~2,5)(~5,~3,0)")
-            sage: T = T0.copy(mutable=True)
-            sage: T.flip_back(1)
-            sage: T.flip_back(3)
-            sage: T.flip_back(0)
-            sage: T.flip_back(2)
-            sage: T.relabel("(0,2)(1,3)(~0,~2)(~1,~3)")
-            sage: T == T0
-            True
-
-        An example with boundary::
-
-            sage: t = Triangulation("(0,1,2)(~0,3,4)(~4,~3,~2,~1)", {"~1": 1, "~2": 1, "~3": 1, "~4": 1}, mutable=True)
-            sage: t.relabel("(0,3)(1,~2)(~0,~3)(~1,2)")
-            sage: t
-            Triangulation("(0,4,~3)(~1,3,~2)(~0:1,1:1,2:1,~4:1)")
-
-        Veering triangulations::
-
-            sage: T = VeeringTriangulation("(0,1,2)(~0,~1,~2)", "RBB", mutable=True)
-            sage: T.relabel([0,1,3,2,5,4])
-            sage: T
-            VeeringTriangulation("(0,~1,~2)(~0,1,2)", "RBB")
-            sage: T._check()
-
-        Composing relabellings and permutation composition (from left to right)::
-
-            sage: from veerer.permutation import perm_compose, perm_random_centralizer
-            sage: fp = "(0,16,~15)(1,19,~18)(2,22,~21)(3,21,~20)(4,20,~19)(5,23,~22)(6,18,~17)(7,17,~16)(8,~1,~23)(9,~2,~8)(10,~3,~9)(11,~4,~10)(12,~5,~11)(13,~6,~12)(14,~7,~13)(15,~0,~14)"
-            sage: cols = "RRRRRRRRBBBBBBBBBBBBBBBB"
-            sage: T0 = VeeringTriangulation(fp, cols)
-            sage: ep = T0.edge_permutation()
-            sage: for _ in range(10):
-            ....:     p1 = perm_random_centralizer(ep)
-            ....:     p2 = perm_random_centralizer(ep)
-            ....:     T1 = T0.copy(mutable=True)
-            ....:     T1.relabel(p1)
-            ....:     T1.relabel(p2)
-            ....:     T2 = T0.copy(mutable=True)
-            ....:     T2.relabel(perm_compose(p1, p2))
-            ....:     assert T1  == T2
-
-        TESTS:
-
-        This example used to be wrong::
-
-            sage: T = VeeringTriangulation([(0,1,2), (-1,-2,-3)], [RED, RED, BLUE], mutable=True)
-            sage: from veerer.permutation import perm_random_centralizer
-            sage: for _ in range(10):
-            ....:     r = perm_random_centralizer(T.edge_permutation())
-            ....:     T.relabel(r)
-            ....:     T._check()
+            sage: m = OrientedMap(vp="(0,5,3,~3)(~0)", mutable=True)
+            sage: m.relabel()
+            sage: m
+            OrientedMap("(0,2,1,~1)(~0)", "(0,~0,~1,2)(1)")
         """
-        if check:
+        # NOTE: if this operation is used often, it would not be too complicated
+        # to make it inplace
+        if check >= 1:
             self._assert_mutable()
 
-        if check:
+        if p is None:
+            p = array('i', [-1] * len(self._vp))
+            ee = 0
+            for e in range(len(self._vp) // 2):
+                if self._vp[2 * e] != -1:
+                    p[2 * e] = 2 * ee
+                    p[2 * e + 1] = 2 * ee + 1
+                    ee += 1
+
+        elif check >= 2:
             p = check_relabelling(p, len(self._vp) // 2)
 
-        # TODO: would better be inplace!!
         self._vp = perm_conjugate(self._vp, p)
         self._fp = perm_conjugate(self._fp, p)
-        self._check()
+        remove_trailing_minus_ones(self._vp)
+        remove_trailing_minus_ones(self._fp)
 
     # TODO: consider listing all quotients by looking at blocks under the monodromy group
     def automorphism_quotient(self, mapping=False, mutable=False, check=True):
