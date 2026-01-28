@@ -69,7 +69,7 @@ def tree_co_tree(G):
         if e == path[-1]:
             path.pop()
             e = fp[e1]
-        elif res[e] == 0:
+        elif res[e//2] == 0:
             e = fp[e]
         elif not C_found[hedge_to_face[e1]]:
             C_found[hedge_to_face[e1]] = True
@@ -185,7 +185,7 @@ class QuadSystem:
         F,cor, _, _ = tree_contraction(G,treecotree)
         vp = F.vertex_permutation(copy=False)
         fp = F.face_permutation(copy=False)
-        qvp = [None for _ in range(8 * self._genus]
+        qvp = [None for _ in range(8 * self._genus)]
         remember = [None for _ in range(4 * self._genus)]
         remember2 = [None for _ in range(4 * self._genus)]
         
@@ -223,6 +223,8 @@ class QuadSystem:
                 da = 2 * remember2[edge] + 1
                 cor2.append([da, qvp[da - 1]])
         self._proj = cor2
+
+
 
 
 
