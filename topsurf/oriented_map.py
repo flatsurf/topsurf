@@ -261,7 +261,7 @@ class OrientedMap:
     def _half_edge_string(self, e):
         return '~%d' % (e // 2) if e % 2 else '%d' % (e // 2)
 
-    def __str__(self, *args, **kwds):
+    def __str__(self):
         vp_cycles = perm_cycles(self._vp)
         vertices = perm_cycles_to_string(vp_cycles, edge_like=True)
         fp_cycles = perm_cycles(self._fp)
@@ -483,7 +483,8 @@ class OrientedMap:
             edges[(u, v)].append(e)
 
         half_edge_end = [half_edge_start[h ^ 1] for h in range(len(self._vp))]
-
+        
+        edge_vertices=[None]*(len(self._vp)//2)
         if subdivide:
             loops = []
             multiple_edges = []
@@ -500,6 +501,7 @@ class OrientedMap:
                         embedding[w1] = [v, w0]
                         half_edge_end[2 * e] = w0
                         half_edge_end[2 * e + 1] = w1
+                        edge_vertices[e] = [u, w0, w1, u]
                 elif len(edge_list) > 1:
                     # subdivide in two
                     for e in edge_list:
@@ -509,9 +511,11 @@ class OrientedMap:
                         embedding[w] = [u, v]
                         half_edge_end[2 * e] = w
                         half_edge_end[2 * e + 1] = w
+                        edge_vertices[e] = [u, w, v]
                 else:
                     e, = edge_list
                     G.add_edge(u, v, e)
+                    edge_vertices[e] = [u, v]
         else:
             for e in range(0, len(self._vp) // 2):
                 G.add_edge(half_edge_start[2 * e], half_edge_start[2 * e + 1], e)
@@ -523,15 +527,35 @@ class OrientedMap:
             for j in reversed(v):
                 embedding[i].append(half_edge_end[j])
 
-        return G, embedding, root_edge
+        return G, embedding, root_edge, edge_vertices
 
-    def plot(self, oriented=False, subdivide=True, root=None, edge_labels=True, vertex_colors=None):
-        G, em, r = self.graph(oriented=oriented, subdivide=subdivide, root=root)
+    def plot(self, oriented=False, subdivide=True, root=None, edge_labels=True, vertex_colors=None, edge_colors=None):
+        r"""
+        Plot the map.
+
+        INPUT:
+            - ``oriented``: boolean specifying whether edge should be oriented.
+            - ``subdivide``: boolean specifying whether multiple edges and loop should be subdivided for pretty plotting.
+            - ``edge_labels``: boolean specifying whether to plot the labels of the edges.
+            - ``edge_colors``: dictionnary specifying the color to assign to each edge color.
+            - ``vertex_colors``: dictionnary specifying the color to assign to each vertex color.
+            
+        """
+        
+        G, em, r, edge_list = self.graph(oriented=oriented, subdivide=subdivide, root=root)
         pos = G.layout_planar(on_embedding=em, external_face=r)
         if vertex_colors is None:
             vertex_colors={'red':list(range(self.num_vertices()))}
         vertex_colors['#C0C0C0'] = list(range(self.num_vertices(), G.order()))
-        return G.plot(pos=pos, vertex_labels=False, edge_labels=edge_labels, vertex_colors=vertex_colors)
+        if edge_colors is None:
+            edge_cols = None
+        else:
+            edge_cols = collections.defaultdict(list)
+            for c, edges in edge_colors.items():
+                for e in edges:
+                    edge_cols[c].extend(edge_list[e][i:i+2] for i in range(len(edge_list[e])-1))
+                
+        return G.plot(pos=pos, vertex_labels=False, edge_labels=edge_labels, vertex_colors=vertex_colors, edge_colors=edge_cols)
 
     def __eq__(self, other):
         return self._vp == other._vp
@@ -1289,7 +1313,7 @@ class OrientedMap:
     #############
 
     # TODO: delete and use the more general relabel (with list of cycles)
-    def swap(self, h0, h1, check=2):
+    #def swap(self, h0, h1, check=2):
         r"""
          Modify the map by multiplying the vertex and face permutations
          by the transposition ``(h0, h1)`` respectively on left and right.
@@ -1322,7 +1346,7 @@ class OrientedMap:
             sage: m
             OrientedMap("(1)(3)(~3)", "(1)(3,~3)")
         """
-        if check >= 1:
+        """if check >= 1:
             self._assert_mutable()
             h0 = self._check_half_edge(h0)
             h1 = self._check_half_edge(h1)
@@ -1334,7 +1358,7 @@ class OrientedMap:
         fp1_pre = self._ep(vp[h1])
 
         vp[h0], vp[h1] = vp[h1], vp[h0]
-        fp[fp0_pre], fp[fp1_pre] = fp[fp1_pre], fp[fp0_pre]
+        fp[fp0_pre], fp[fp1_pre] = fp[fp1_pre], fp[fp0_pre]"""
 
     def contract_edge(self, e, check=2):
         r"""
