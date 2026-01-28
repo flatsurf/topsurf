@@ -9,7 +9,9 @@ cell decomposition of an oriented surface.
 #
 #       Copyright (C) 2018 Mark Bell
 #                     2018-2026 Vincent Delecroix
+#                     2026 Oscar Fontaine
 #                     2024 Kai Fu
+#                     2026 Juliette Schabanel
 #                     2018 Saul Schleimer
 #
 #  This program is free software; you can redistribute it and/or
@@ -35,10 +37,11 @@ from array import array
 from sage.structure.richcmp import op_LT, op_LE, op_EQ, op_NE, op_GT, op_GE, rich_to_bool
 
 from topsurf.permutation import (perm_init, perm_check, perm_cycles, perm_on_array, perm_on_edge_array,
-                          perm_invert, perm_conjugate, perm_cycle_string, perm_cycles_lengths,
+                          perm_invert, perm_conjugate, perm_conjugate_transposition_inplace, perm_cycle_string, perm_cycles_lengths,
                           perm_cycles_to_string, perm_on_list, perm_on_edge_list, perm_cycle_type,
                           perm_num_cycles, str_to_cycles, str_to_cycles_and_data, perm_compose, perm_from_base64_str,
                           uint_base64_str, uint_from_base64_str, perm_base64_str,
+                          perm_orbit, perm_orbit_size,
                           perms_are_transitive, perms_orbits, perm_edge_orbits, edge_relabelling_from, array_hash)
 
 
@@ -106,6 +109,7 @@ def remove_trailing_minus_ones(p):
 #    hash
 #    relabel
 #    TODO: keep best relabelling generic stuff with reasonable cost
+# TODO: ambiguity oriented could refer to the orientation of edges
 class OrientedMap:
     r"""
     Map on oriented surface.
@@ -439,8 +443,8 @@ class OrientedMap:
             sage: from topsurf import OrientedMap
             sage: m = OrientedMap(vp="(0,~2)(~0,3,1)(~1,~5,2)(~3,4)(~4,5)")
             sage: G, em = m.graph()
-            sage: pos = G.layout_planar(on_embedding=em, external_face=)
-            sage: G.plot(pos=, vertex_labels=False, edge_labels=True)
+            sage: pos = G.layout_planar(on_embedding=em, external_face=0)
+            sage: G.plot(pos=pos, vertex_labels=False, edge_labels=True)
         """
         # NOTE: sage graphs use *clockwise* order for the neighbors
         if self.has_folded_edge():
@@ -509,6 +513,11 @@ class OrientedMap:
                 embedding[i].append(half_edge_end[j])
 
         return G, embedding
+
+    def plot(self):
+        G, em = self.graph()
+        pos = G.layout_planar(on_embedding=em, external_face=0)
+        return G.plot(pos=pos, vertex_labels=False, edge_labels=True)
 
     def to_string(self):
         r"""
@@ -806,7 +815,7 @@ class OrientedMap:
             sage: m.next_in_face(1)
             Traceback (most recent call last):
             ...
-            ValueError: invalid half-edge (=1); the underlying edges is folded
+            ValueError: invalid half-edge (=1); the underlying edge is folded
         """
         if check:
             h = self._check_half_edge(h)
@@ -968,6 +977,9 @@ class OrientedMap:
         """
         return perm_cycles(self._vp, True)
 
+    def vertex_profile(self):
+        return sorted(perm_cycles_lengths(self._vp), reverse=True)
+
     def num_vertices(self):
         r"""
         Return the number of vertices.
@@ -997,6 +1009,9 @@ class OrientedMap:
         """
         return perm_cycles(self._fp, True)
 
+    def face_profile(self):
+        return sorted(perm_cycles_lengths(self._fp), reverse=True)
+
     def num_faces(self):
         r"""
         Return the number of faces.
@@ -1011,6 +1026,38 @@ class OrientedMap:
             1
         """
         return perm_num_cycles(self._fp)
+
+    def vertex_degree(self, h, check=True):
+        r"""
+        Return the degree of the vertex incident to the half-edge ``h``.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+
+            sage: m = OrientedMap(vp="(0,1,2)(3,4,5)(~0,~3,6)")
+            sage: m.vertex_degree(2)
+            3
+        """
+        if check:
+            self._check_half_edge(h)
+        return perm_orbit_size(self._vp, h)
+
+    def face_degree(self, h, check=True):
+        r"""
+        Return the degree of the face incident to the half-edge ``h``.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+
+            sage: m = OrientedMap(vp="(0,1,2)(3,4,5)(~0,~3,6)")
+            sage: m.face_degree(2)
+            9
+        """
+        if check:
+            self._check_half_edge(h)
+        return perm_orbit_size(self._fp, h)
 
     def is_connected(self):
         r"""
@@ -1790,10 +1837,8 @@ class OrientedMap:
             vp[2 * e + 1] = self._ep(h1)
             vp[fp[2 * e + 1]] = 2 * e
             vp[fp[2 * e]] = 2 * e + 1
-            
-        
 
-    def flip_orientation(self, e, check=True):
+    def reverse_orientation(self, e, check=True):
         r"""
         Change the orientation of the edge ``e``.
 
@@ -1802,31 +1847,32 @@ class OrientedMap:
             sage: from topsurf import OrientedMap
 
             sage: m = OrientedMap(fp="(0,1,2)(~0,~1,~2)", mutable=True)
-            sage: m.flip_orientation(0)
+            sage: m.reverse_orientation(0)
             sage: m
             OrientedMap("(0,2,~1,~0,~2,1)", "(0,~1,~2)(~0,1,2)")
-            sage: m.flip_orientation(1)
+            sage: m.reverse_orientation(1)
             sage: m
             OrientedMap("(0,2,1,~0,~2,~1)", "(0,1,~2)(~0,~1,2)")
-            sage: m.flip_orientation(2)
+            sage: m.reverse_orientation(2)
             sage: m
             OrientedMap("(0,~2,1,~0,2,~1)", "(0,1,2)(~0,~1,~2)")
 
             sage: m = OrientedMap(fp="(0,~5,4)(3,5,6)(1,2,~6)", mutable=True)
-            sage: m.flip_orientation(0)
+            sage: m.reverse_orientation(0)
             sage: m
             OrientedMap("(0,4,5,3,~6,2,1,6,~5)", "(0,~5,4)(1,2,~6)(3,5,6)")
-            sage: m.flip_orientation(5)
+            sage: m.reverse_orientation(5)
             sage: m
             OrientedMap("(0,4,~5,3,~6,2,1,6,5)", "(0,5,4)(1,2,~6)(3,~5,6)")
+            sage: m._check()
 
         One can alternatively use ``relabel`` (which would be slower in that
         situation)::
 
             sage: m = OrientedMap(fp="(0,~5,4)(1,2,~6)(3,5,6)", mutable=True)
             sage: m1 = m.copy()
-            sage: m1.flip_orientation(5)
-            sage: m1.flip_orientation(6)
+            sage: m1.reverse_orientation(5)
+            sage: m1.reverse_orientation(6)
             sage: m2 = m.copy()
             sage: m2.relabel("(5,~5)(6,~6)")
             sage: m1 == m2
@@ -1836,42 +1882,22 @@ class OrientedMap:
             self._assert_mutable()
             e = self._check_edge(e)
 
-        vp = self._vp
         ep = self._ep
-        fp = self._fp
-
         h = 2 * e
         H = self._ep(h)
         if h == H:
             return
 
-        # images/preimages by vp
-        h_vp = vp[h]
-        H_vp = vp[H]
-        h_vp_inv = fp[H]
-        H_vp_inv = fp[h]
-        assert vp[h_vp_inv] == h
-        assert vp[H_vp_inv] == H
+        h_vp_inv = self.previous_at_vertex(h)
+        H_vp_inv = self.previous_at_vertex(H)
+        h_fp_inv = self.previous_in_face(h)
+        H_fp_inv = self.previous_in_face(H)
 
-        # images/preimages by fp
-        h_fp = fp[h]
-        H_fp = fp[H]
-        h_fp_inv = ep(h_vp)
-        H_fp_inv = ep(H_vp)
-        assert fp[h_fp_inv] == h
-        assert fp[H_fp_inv] == H
-
-        fp[h_fp_inv] = H
-        fp[H_fp_inv] = h
-        vp[h_vp_inv] = H
-        vp[H_vp_inv] = h
-        fp[h] = H_fp
-        fp[H] = h_fp
-        vp[h] = H_vp
-        vp[H] = h_vp
+        perm_conjugate_transposition_inplace(self._vp, h, H, h_vp_inv, H_vp_inv)
+        perm_conjugate_transposition_inplace(self._fp, h, H, h_fp_inv, H_fp_inv)
 
     # TODO: if given as cycles, can we make it O(input size)?
-    def relabel(self, p=None, check=True):
+    def relabel(self, p=None, check=2):
         r"""
         Relabel this triangulation inplace.
 
@@ -1893,6 +1919,7 @@ class OrientedMap:
             sage: m.relabel("(0,~1)")
             Traceback (most recent call last):
             ...
+            ValueError: immutable map; use a mutable copy instead
 
         An example where ``p`` is not provided::
 
@@ -2591,11 +2618,9 @@ class OrientedMap:
             False
 
         """
-        if check:
-            self._check()
-        if mutable==None:
-            mutable=self._mutable
-        return OrientedMap(fp=self._vp,mutable=mutable)
+        if mutable is None:
+            mutable = self._mutable
+        return OrientedMap(fp=self._vp, mutable=mutable)
 
 
     def smoothing(self, h, check=True):
@@ -2727,6 +2752,8 @@ class OrientedMap:
         Move the half_edge h to the corner after c.
 
         EXAMPLES::
+
+            sage: from topsurf import OrientedMap
 
             sage: G = OrientedMap(vp = [[0, 4, 2], [1], [3], [5]], mutable=True)
             sage: G.move_half_edge(4, 1)

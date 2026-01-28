@@ -201,7 +201,21 @@ def small_maps(folded=True):
     yield OrientedMap("(0,~1,1,~0)")
 
 
-def test_contract_edge():
+def test_reverse_orientation():
+    for m0 in small_maps(folded=False):
+        m1 = m0.copy(mutable=True)
+        for e in m1.edges():
+            m1.reverse_orientation(e)
+            m1._check()
+            assert m0.vertex_profile() == m1.vertex_profile(), m0
+            assert m1.face_profile() == m1.face_profile(), m0
+            assert m0.euler_characteristic() == m1.euler_characteristic(), m0
+            m1.reverse_orientation(e)
+            m1._check()
+            assert m1 == m0
+
+
+def test_insert_edge_contract_edge():
     from topsurf import OrientedMap
 
     for m in small_maps():
@@ -210,6 +224,33 @@ def test_contract_edge():
             mm.contract_edge(e)
             mm._check()
             assert mm.num_edges() == m.num_edges() - 1
+
+    m = OrientedMap("", "", mutable=True)
+
+    m.insert_edge(-1, -1)
+    m._check()
+    assert m == OrientedMap("(0)(~0)", "(0,~0)")
+
+    m.insert_edge(-1, -2)
+    m._check()
+    assert m == OrientedMap("(0)(~0)(1,~1)", "(0,~0)(1)(~1)")
+
+    m.insert_edge(0, -1)
+    m.insert_edge(-1, 2)
+    m._check()
+    assert m == OrientedMap("(0)(~0,~2,2)(1,3,~3,~1)", "(0,2,~0)(1,~3)(~1)(~2)(3)")
+
+    m.insert_edge(0, 6)
+    m._check()
+    assert m == OrientedMap("(0)(~0,~2,2,~4,~3,~1,1,3,4)", "(0,4,2,~0)(1,~3)(~1)(~2)(3,~4)")
+
+    m.contract_edge(2)
+    m._check()
+    assert m == OrientedMap("(0)(~0,~4,~3,~1,1,3,4)", "(0,4,~0)(1,~3)(~1)(3,~4)")
+
+    m.contract_edge(0)
+    m._check()
+    assert m == OrientedMap("(1,3,4,~4,~3,~1)", "(1,~3)(~1)(3,~4)(4)")
 
 
 def test_add_edge_delete_edge():

@@ -1,0 +1,4 @@
+topsurf/*.c
+topsurf/*.so
+__pycache__
+doc/_build
