@@ -25,6 +25,7 @@ The main class in this module is :class:`ColoredOrientedMap`.
 
 from topsurf import OrientedMap
 from topsurf.permutation import (perm_cycles, perm_cycles_to_string, perm_orbit)
+from collections import defaultdict
 
 class ColoredOrientedMap(OrientedMap):
     r"""
@@ -117,22 +118,6 @@ class ColoredOrientedMap(OrientedMap):
         """
         return self._vertex_colors[self._v_id(h)]
 
-    def set_edge_color(self, h, col, check=True)
-        r"""
-        Change the color of the half edge h to col
-        """
-        if check:
-            self._assert_mutable()
-        self._edge_colors[h//2] = col
-
-    def set_vertex_color(self, h, col, check=True)
-        r"""
-        Change the color of the vertex incident to half edge h to col
-        """
-        if check:
-            self._assert_mutable()
-        self._vertex_colors[self._v_id(h)] = col
-
     
     def submap(self, edges, mutable=False, check=True):
         r"""
@@ -148,10 +133,82 @@ class ColoredOrientedMap(OrientedMap):
         sub_vert_colors = {(v[0] - 2*sum([e not in edges for e in range(v[0]//2)])): self.vertex_color(v[0]) for v in unlab_submap.vertices()}
         
         return ColoredOrientedMap(vp=relab_submap._vp, ecolors=sub_edge_colors, vcolors=sub_vert_colors, mutable=mutable, check=check)
+
+
+    def plot(self, oriented=False, subdivide=True, root=None, edge_labels=True, vertex_colors=None, edge_colors=None):
+        r"""
+        Plot the map.
+
+        INPUT:
+            - ``oriented``: boolean specifying whether edge should be oriented.
+            - ``subdivide``: boolean specifying whether multiple edges and loop should be subdivided for pretty plotting.
+            - ``edge_labels``: boolean specifying whether to plot the labels of the edges.
+            - ``edge_colors``: dictionnary specifying the color to assign to each edge color.
+            - ``vertex_colors``: dictionnary specifying the color to assign to each vertex color.
             
-    
+        """
+
+        if edge_colors is None:
+            edge_cols = None
+        else:
+            edge_cols = defaultdict(list)
+            for e, c in enumerate(self._edge_colors):
+                col = edge_colors.get(c)
+                if col is not None:
+                    edge_cols[col].append(e)
+
+        if vertex_colors is None:
+            vert_cols = None
+        else: 
+            vert_cols = defaultdict(list)
+            for i, v in enumerate(self.vertices()):
+                c = vertex_colors.get(self.vertex_color(v[0]))
+                if c is not None:
+                    vert_cols[c].append(i)
+
+        return OrientedMap.plot(self, oriented=oriented, subdivide=subdivide, root=root, edge_labels=edge_labels, edge_colors=edge_cols, vertex_colors=vert_cols)
             
 
+    #############
+    # Mutations #
+    #############
+    
+    def set_edge_color(self, h, col, check=True):
+        r"""
+        Change the color of the half edge h to col
+        """
+        if check:
+            self._assert_mutable()
+        self._edge_colors[h//2] = col
+
+    def set_vertex_color(self, h, col, check=True):
+        r"""
+        Change the color of the vertex incident to half edge h to col
+        """
+        if check:
+            self._assert_mutable()
+        self._vertex_colors[self._v_id(h)] = col
+
+
+    def add_edge(self, h0=-1, h1=-1, e=None, col=None, check=2):
+        r"""
+        Add an edge between the corners of ``h0`` and ``h1`` with color ``col``.
+        """
+        
+        OrientedMap.add_edge(self, h0, h1, e, check)
+        self._edge_colors.append(col)
+
+
+    #def insert_edge(self, h0=-1, h1=-1, e=None, col=None, check=2):
+        r"""
+        Add an edge by spliting the vertex of ``h0``and ``h1``between them with color col.
+        """
+
+
+    #def contract_edge
+
+
+    #def delete_edge 
 
 
 
