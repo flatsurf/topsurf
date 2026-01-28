@@ -2,6 +2,7 @@
 
 
 from topsurf import OrientedMap
+from collections import deque
 
 
 
@@ -156,11 +157,12 @@ class QuadSystem:
 
     def __init__(self, G, treecotree=None, check=True):
         r"""
-        Methods :
-            _origin_map : the original OrientedMap
-            _genus : the genus of the underlying surface
-            _quad : the quad system
-            _proj : the projection from _origin_map half-edges to path of length 2 of _quad
+        Methods:
+            _origin_map: the original OrientedMap
+            _genus: the genus of the underlying surface
+            _quad: the quad system
+            _proj: the projection from _origin_map half-edges to path of length 2 of _quad
+            _turn: a list of edges that gives a coefficient to each half-edge around each vertex corresponding at the turn
         """
 
         if check:
@@ -223,6 +225,72 @@ class QuadSystem:
                 da = 2 * remember2[edge] + 1
                 cor2.append([da, qvp[da - 1]])
         self._proj = cor2
+
+        self._turn = list(self._quad.half_edges())
+        label = 0
+        for v in self._quad.vertices():
+            for e in v:
+                self._turn[e] = label
+                label += 1
+
+
+    def _check(self):
+        self._origin_map._check()
+        if self._genus < 2:
+            raise ValueError("Too low genus for a quad system")
+        self._quad._check()
+
+    def __eq__(self, other):
+        return (self._origin_map == other._origin_map) and (self._quad == other._quad) and (self._proj == other._proj)
+
+    def turn(self, h1, h2):
+        l1 = self._turn[h1]
+        l2 = self._turn[l2]
+        if l1 // (4 * self._genus) != l2 // (4 * self._genus):
+            raise ValueError("The two half_edges does not belong to the same vertex")
+        nl1 = l1 % (4 * self._genus)
+        nl2 = l2 % (4 * self._genus)
+        if nl1 <= nl2:
+            return nl2 - nl1
+        else:
+            return 4 * self._genus + nl2 - nl1
+
+
+
+class Geodesic:
+
+    # TODO : Documentation + Change name ?
+
+    def __init__(self, Q, geo=None, turn=None, check=False):
+        r"""
+        Methods:
+            _quadsystem: the underlying quad system
+            _geodesic: the canonical geodesic representative in the quad system (as a deque !)
+            _turn_sequence: the turn sequence associated to _geodesic
+        """
+        self._quadsystem = Q
+        if geo == None or not geo:
+            self._geodesic = deque([])
+            self._turn_sequence = deque([])
+        elif turn == None:
+            if check:
+                raise NotImplementedError
+            self._geodesic = deque(geo)
+            self._turn_sequence = deque([])
+            h0 = geo[0]
+            for index in range(1, len(geo)):
+                h1 = geo[index]
+                self._turn_sequence.append(Q.turn(Q._origin_map._ep(h0), h1))
+                h0 = h1
+        else:
+            if check:
+                raise NotImplementedError
+            self._geodesic = deque(geo)
+            self._turn_sequence = deque(turn)
+                
+                
+
+
 
 
 
