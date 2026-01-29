@@ -184,6 +184,22 @@ def turn_add(s, turn, num):
         else:
             s.append((turn, num))
 
+def turn_add_left(s, turn, num):
+    r"""
+    Add num turns at the beginning of s.
+    """
+    if num<=0:
+        return
+    if len(s) == 0:
+        s.append((turn,num))
+    else:
+        if s[0][0] == turn:
+            (a,b) = s.popleft()
+            s.appendleft((a, b + num))
+        else:
+            s.appendleft((turn, num))
+    
+
 def turn_modif(s, mod, d):
     if len(s) == 0:
         return
@@ -194,6 +210,17 @@ def turn_modif(s, mod, d):
         s.append((r, 1))
     else:
         turn_add(s, r, 1)
+
+def turn_modif_left(s, mod, d):
+    if len(s) == 0:
+        return
+    (t, n) = s.popleft()
+    r = (t + mod) % d
+    if n > 1:
+        s.appendleft((t, n-1))
+        s.appendleft((r, 1))
+    else:
+        turn_add_left(s, r, 1)
 
 
 def bracket_removal(Q, geo, s, positive, length, d):
@@ -225,11 +252,45 @@ def bracket_removal(Q, geo, s, positive, length, d):
             geo.pop()
         geo = geo.extend(l)
         s.pop()
-        if length!=0:
+        if length != 0:
             s.pop()
         turn_modif(s, 1, d)
         turn_add(s, 2, length)
 
+
+def bracket_removal_left(Q, geo, s, positive, length, d):
+    r"""
+    Remove a bracket of length ``length`` at the beginning of geo with turn sequence s.
+    """
+    fp=Q.face_permutation(copy=False)
+    if positive:
+        l = deque([])
+        for i in range(length + 1):
+            edge = geo[i]
+            edge1 = Q._ep(edge)
+            l.appendleft(fp[fp[edge1]])
+        for i in range(length + 2):
+            geo.popleft()
+        geo = geo.extendleft(l)
+        s.popleft()
+        if length != 0:
+            s.popleft()
+        turn_modif_left(s, -1, d)
+        turn_add_left(s, d - 2, length)
+    else:
+        l=deque([])
+        for i in range(length + 1):
+            edge = fp[fp[geo[i]]]
+            edge1 = Q._ep(edge)
+            l.appendleft(edge1)
+        for _ in range(length + 2):
+            geo.popleft()
+        geo = geo.extendleft(l)
+        s.popleft()
+        if length != 0:
+            s.popleft()
+        turn_modif_left(s, 1, d)
+        turn_add_left(s, 2, length)
 
 
 class QuadSystem:
@@ -398,14 +459,43 @@ class Geodesic:
             elif len(self._turn_sequence) >= 2 and newturn == 1 and self._turn_sequence[-1][0] == 2 and self._turn_sequence[-2][0] == 1:
                 # positive bracket of length more than one
                 bracket_removal(Q, self._geodesic, self._turn_sequence, True, self._turn_sequence[-1][1], d)
-            elif len(self._turn_sequence) >= 1 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 1:
+            elif len(self._turn_sequence) >= 1 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 1: # negative bracket of length one
                 bracket_removal(Q, self._geodesic, self._turn_sequence, False, 0, d)
             elif len(self._turn_sequence) >= 2 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 2 and self._turn_sequence[-2][0] == d - 1:
-                # positive bracket of length more than one
+                # negative bracket of length more than one
                 bracket_removal(Q, self._geodesic, self._turn_sequence, False, self._turn_sequence[-1][1], d)
             else:
                 self._geodesic.append(e)
                 turn_add(self._turn_sequence, newturn, 1)
+
+
+    def add_edge_left(self, e):
+        
+        Q = self._quadsystem._quad
+        fp = Q.face_permutation(copy=False)
+        d = 4 * self._quadsystem._genus
+        if len(self._geodesic) == 0:
+            self._geodesic.appendleft(e)
+        else:
+            pre = self._geodesic[0]
+            newturn = self._quadsystem.turn(Q._ep(e), pre)
+            
+            if newturn == 0: #spur
+                self._geodesic.popleft()
+                turn_remove_left(self._turn_sequence)
+            elif len(self._turn_sequence) >= 1 and newturn == 1 and self._turn_sequence[0][0] == 1: # positive bracket of length one
+                bracket_removal_left(Q, self._geodesic, self._turn_sequence, True, 0, d)
+            elif len(self._turn_sequence) >= 2 and newturn == 1 and self._turn_sequence[0][0] == 2 and self._turn_sequence[1][0] == 1:
+                # positive bracket of length more than one
+                bracket_removal_left(Q, self._geodesic, self._turn_sequence, True, self._turn_sequence[-1][1], d)
+            elif len(self._turn_sequence) >= 1 and newturn == d - 1 and self._turn_sequence[0][0] == d - 1: # negative bracket of length one
+                bracket_removal_left(Q, self._geodesic, self._turn_sequence, False, 0, d)
+            elif len(self._turn_sequence) >= 2 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 2 and self._turn_sequence[-2][0] == d - 1:
+                # negative bracket of length more than one
+                bracket_removal_left(Q, self._geodesic, self._turn_sequence, False, self._turn_sequence[-1][1], d)
+            else:
+                self._geodesic.appendleft(e)
+                turn_add_left(self._turn_sequence, newturn, 1)
 
 
     def origin_simplification(self):
