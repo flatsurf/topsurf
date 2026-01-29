@@ -386,7 +386,7 @@ class QuadSystem:
         return (self._origin_map == other._origin_map) and (self._quad == other._quad) and (self._proj == other._proj)
 
     def __repr__(self, *args, **kwds):
-        return __repr__(self._quad, *args, **kwds)
+        return self._quad.__repr__(*args, **kwds)
 
     def turn(self, h1, h2):
         l1 = self._turn[h1]
@@ -441,6 +441,43 @@ class Geodesic:
         return f"Geodesic \"{self._geodesic}\" with turns \"{self._turn_sequence}\""
 
     def add_edge(self, e):
+        r"""
+        Add an edge at the end of self and perform simplification to maintain it geodesical.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap, QuadSystem, Geodesic
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6], [5, 8, 10, 12], [3, 11, 13, 7, 1, 9]])
+            sage: Q = QuadSystem(m)
+            sage: Q
+            OrientedMap("(0,1,2,3,4,5,6,7)(~0,~3,~5,~1,~6,~2,~4,~7)", "(0,~7,6,~1)(~0,7,~4,3)(1,~5,4,~2)(2,~6,5,~3)")
+            sage: p = Geodesic(Q)
+            sage: p.add_edge(12)
+            sage: p.add_edge(5)
+            sage: p.add_edge(8)
+            sage: p.add_edge(1)
+            sage: p
+            Geodesic "deque([12, 5, 8, 1])" with turns "deque([(1, 1), (2, 2)])"
+            sage: p.add_edge(2)
+            sage: p
+            Geodesic "deque([10, 1, 12])" with turns "deque([(6, 2)])"
+            sage: p.add_edge(13)
+            sage: p
+            Geodesic "deque([10, 1])" with turns "deque([(6, 1)])"
+            sage: p.add_edge(14)
+            sage: p.add_edge(9)
+            sage: p
+            Geodesic "deque([10, 7])" with turns "deque([(7, 1)])"
+            sage: p.add_edge(8)
+            sage: p.add_edge(15)
+            sage: p
+            Geodesic "deque([10, 1])" with turns "deque([(6, 1)])"
+            sage: p.add_edge(14)
+            sage: p.add_edge(5)
+            sage: p.add_edge(2)
+            sage: p
+            Geodesic "deque([10, 7, 10])" with turns "deque([(7, 1), (2, 1)])"
+        """
 
         Q = self._quadsystem._quad
         fp = Q.face_permutation(copy=False)
@@ -470,6 +507,43 @@ class Geodesic:
 
 
     def add_edge_left(self, e):
+        r"""
+        Add an edge at the beginning of self and perform simplification to maintain it geodesical.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap, QuadSystem, Geodesic
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6], [5, 8, 10, 12], [3, 11, 13, 7, 1, 9]])
+            sage: Q = QuadSystem(m)
+            sage: Q
+            OrientedMap("(0,1,2,3,4,5,6,7)(~0,~3,~5,~1,~6,~2,~4,~7)", "(0,~7,6,~1)(~0,7,~4,3)(1,~5,4,~2)(2,~6,5,~3)")
+            sage: p = Geodesic(Q)
+            sage: p.add_edge_left(2)
+            sage: p.add_edge_left(1)
+            sage: p.add_edge_left(8)
+            sage: p.add_edge_left(5)
+            Geodesic "deque([5, 8, 1, 2])" with turns "deque([(2, 2), (1, 1)])"
+            sage: p.add_edge_left(12)
+            sage: p
+            Geodesic "deque([10, 1, 12])" with turns "deque([(6, 2)])"
+            sage: p.add_edge_left(11)
+            sage: p
+            Geodesic "deque([1, 12])" with turns "deque([(6, 1)])"
+            sage: p.add_edge_left(6)
+            sage: p.add_edge_left(9)
+            sage: p
+            Geodesic "deque([15, 12])" with turns "deque([(7, 1)])"
+            sage: p.add_edge_left(8)
+            sage: p.add_edge_left(7)
+            sage: p
+            Geodesic "deque([1, 12])" with turns "deque([(6, 1)])"
+            
+            sage: p.add_edge_left(6)
+            sage: p.add_edge_left(11)
+            sage: p.add_edge_left(2)
+            sage: p
+            Geodesic "deque([4, 15, 12])" with turns "deque([(2, 1), (7, 1)])"
+        """
         
         Q = self._quadsystem._quad
         fp = Q.face_permutation(copy=False)
@@ -487,12 +561,12 @@ class Geodesic:
                 bracket_removal_left(Q, self._geodesic, self._turn_sequence, True, 0, d)
             elif len(self._turn_sequence) >= 2 and newturn == 1 and self._turn_sequence[0][0] == 2 and self._turn_sequence[1][0] == 1:
                 # positive bracket of length more than one
-                bracket_removal_left(Q, self._geodesic, self._turn_sequence, True, self._turn_sequence[-1][1], d)
+                bracket_removal_left(Q, self._geodesic, self._turn_sequence, True, self._turn_sequence[0][1], d)
             elif len(self._turn_sequence) >= 1 and newturn == d - 1 and self._turn_sequence[0][0] == d - 1: # negative bracket of length one
                 bracket_removal_left(Q, self._geodesic, self._turn_sequence, False, 0, d)
-            elif len(self._turn_sequence) >= 2 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 2 and self._turn_sequence[-2][0] == d - 1:
+            elif len(self._turn_sequence) >= 2 and newturn == d - 1 and self._turn_sequence[0][0] == d - 2 and self._turn_sequence[1][0] == d - 1:
                 # negative bracket of length more than one
-                bracket_removal_left(Q, self._geodesic, self._turn_sequence, False, self._turn_sequence[-1][1], d)
+                bracket_removal_left(Q, self._geodesic, self._turn_sequence, False, self._turn_sequence[0][1], d)
             else:
                 self._geodesic.appendleft(e)
                 turn_add_left(self._turn_sequence, newturn, 1)
