@@ -57,7 +57,7 @@ def tree_co_tree(G):
     vp = G.vertex_permutation(copy=False)
     T_found = [False for _ in G.vertices()]
     T_found[0] = True
-    res = [2 for _ in G.edges()]
+    res = [2 for _ in G.edge_indices()]
     e = 0
     path = [e]
 
@@ -1121,3 +1121,232 @@ class Walk:
         c = self._geodesic._geodesic.copy()
         c.extend(c)
         return test_KMP(other._geodesic._geodesic, c)
+
+
+
+
+class LazyGeodesic:
+
+    # TODO : Documentation. Class of geodesic that contains only the first and the last edge and the sequence of turn. Should not be used to test homotopy ! Only contractibility.
+    
+    def __init__(self, Q, geo=None, turn=None, check=False):
+        r"""
+        Methods:
+            _quadsystem: the underlying quad system
+            _first: the first edge
+            _last: the last edge
+            _turn_sequence: the turn sequence associated to _geodesic
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap, QuadSystem, LazyGeodesic
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6], [5, 8, 10, 12], [3, 11, 13, 7, 1, 9]])
+            sage: Q = QuadSystem(m)
+            sage: Q
+            OrientedMap("(0,1,2,3,4,5,6,7)(~0,~3,~5,~1,~6,~2,~4,~7)", "(0,~7,6,~1)(~0,7,~4,3)(1,~5,4,~2)(2,~6,5,~3)")
+            sage: p = LazyGeodesic(Q)
+            sage: TestSuite(p).run()
+        """
+        self._quadsystem = Q
+        if geo == None or not geo:
+            self._first = None
+            self._last = None
+            self._turn_sequence = deque([])
+        elif turn == None:
+            if check:
+                raise NotImplementedError
+            self._first = geo[0]
+            self._last = geo[-1]
+            self._turn_sequence = deque([])
+            h0 = geo[0]
+            for index in range(1, len(geo)):
+                h1 = geo[index]
+                turn_add(self._turn_sequence, Q.turn(Q._quad._ep(h0), h1), 1)
+                h0 = h1
+        else:
+            if check:
+                raise NotImplementedError
+            self._first = geo[0]
+            self._first = geo[-1]
+            self._turn_sequence = deque(turn)
+                
+
+    def __eq__(self, other):
+        return (self._quadsystem == other._quadsystem) and (self._first == other._first) and (self._last == other._last) and (self._turn_sequence == other._turn_sequence)
+
+    def is_empty(self):
+        return self._first == None
+    
+    def __repr__(self, *args, **kwds):
+        return f"LazyGeodesic starting with \"{self._first}\", ending with \"{self._last}\" and with turns \"{self._turn_sequence}\""
+
+    def length(self):
+        r"""
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap, QuadSystem, Geodesic
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6], [5, 8, 10, 12], [3, 11, 13, 7, 1, 9]])
+            sage: Q = QuadSystem(m)
+            sage: Q
+            OrientedMap("(0,1,2,3,4,5,6,7)(~0,~3,~5,~1,~6,~2,~4,~7)", "(0,~7,6,~1)(~0,7,~4,3)(1,~5,4,~2)(2,~6,5,~3)")
+            sage: p = LazyGeodesic(Q)
+            sage: p.length()
+            0
+            sage: q = LazyGeodesic(Q, [2, 5, 8, 1])
+            sage: q.length()
+            4
+        """
+        if self._first == None:
+            return 0
+        n = 1
+        for elt in self._turn_sequence:
+            n += elt[1]
+        return n
+
+
+    def add_edge(self, e):
+        r"""
+        Add an edge at the end of self and perform simplification to maintain it geodesical.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap, QuadSystem, LazyGeodesic
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6],[7, 8, 5], [9, 10, 12, 11], [3, 15, 1, 13, 14]])
+            sage: Q = QuadSystem(m)
+            sage: Q
+            OrientedMap("(0,1,2,3,4,5,6,7)(~0,~5,~6,~7,~4,~1,~2,~3)", "(0,~3,2,~1)(~0,7,~6,5)(1,~4,3,~2)(4,~7,6,~5)")
+            sage: p = LazyGeodesic(Q)
+            sage: p.add_edge(12)
+            sage: p.add_edge(5)
+            sage: p.add_edge(6)
+            sage: p.add_edge(11)
+            sage: p
+            LazyGeodesic starting with "12", ending with "11" and with turns "deque([(4, 1), (1, 1), (2, 1)])"
+            sage: p.add_edge(12)
+            sage: p
+            LazyGeodesic starting with "12", ending with "14" and with turns "deque([(3, 1), (6, 1)])"
+            sage: p.add_edge(15)
+            sage: p
+            LazyGeodesic starting with "12", ending with "3" and with turns "deque([(3, 1)])"
+        """
+
+        Q = self._quadsystem._quad
+        vp = Q.vertex_permutation(copy=False)
+        fp = Q.face_permutation(copy=False)
+        d = 4 * self._quadsystem._genus
+        if self._first == None:
+            self._first = e
+            self._last = e
+        else:
+            pre = self._last
+            newturn = self._quadsystem.turn(Q._ep(pre), e)
+            
+            if newturn == 0 and not self._turn_sequence: #spur
+                self._first = self._last = None
+            elif newturn == 0: #spur
+                cur = self._last 
+                (t, n) = self._turn_sequence.pop()
+                if n > 1:
+                    self._turn_sequence.append((t, n-1))
+                for i in range(d - t):
+                    cur = vp[cur]
+                self._last = Q._ep(cur)
+            elif len(self._turn_sequence) >= 1 and newturn == 1 and self._turn_sequence[-1][0] == 1: # positive bracket of length one
+                self._turn_sequence.pop()
+                turn_modif(self._turn_sequence, -1, d)
+                self._last = Q.previous_in_face(Q._ep(e))
+            elif len(self._turn_sequence) >= 2 and newturn == 1 and self._turn_sequence[-1][0] == 2 and self._turn_sequence[-2][0] == 1:
+                # positive bracket of length more than one
+                _, n = self._turn_sequence.pop()
+                self._turn_sequence.pop()
+                turn_modif(self._turn_sequence, -1, d)
+                turn_add(self._turn_sequence, d - 2, n)
+                self._last = Q.previous_in_face(Q._ep(e))
+            elif len(self._turn_sequence) >= 1 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 1: # negative bracket of length one
+                self._turn_sequence.pop()
+                turn_modif(self._turn_sequence, 1, d)
+                self._last = Q._ep(fp[e])
+            elif len(self._turn_sequence) >= 2 and newturn == d - 1 and self._turn_sequence[-1][0] == d - 2 and self._turn_sequence[-2][0] == d - 1:
+                # negative bracket of length more than one
+                _, n = self._turn_sequence.pop()
+                self._turn_sequence.pop()
+                turn_modif(self._turn_sequence, 1, d)
+                turn_add(self._turn_sequence, 2, n)
+                self._last = Q._ep(fp[e])
+            else:
+                self._last = e
+                turn_add(self._turn_sequence, newturn, 1)
+
+
+    def add_edge_left(self, e):
+        r"""
+        Add an edge at the beginning of self and perform simplification to maintain it geodesical.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap, QuadSystem, LazyGeodesic
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6],[7, 8, 5], [9, 10, 12, 11], [3, 15, 1, 13, 14]])
+            sage: Q = QuadSystem(m)
+            sage: Q
+            OrientedMap("(0,1,2,3,4,5,6,7)(~0,~5,~6,~7,~4,~1,~2,~3)", "(0,~3,2,~1)(~0,7,~6,5)(1,~4,3,~2)(4,~7,6,~5)")
+            sage: p = LazyGeodesic(Q)
+            sage: p.add_edge_left(12)
+            sage: p.add_edge_left(5)
+            sage: p.add_edge_left(6)
+            sage: p.add_edge_left(11)
+            sage: p
+            LazyGeodesic starting with "11", ending with "12" and with turns "deque([(6, 1), (7, 1), (4, 1)])"
+            sage: p.add_edge_left(12)
+            sage: p
+            LazyGeodesic starting with "14", ending with "12" and with turns "deque([(2, 1), (5, 1)])"
+            sage: p.add_edge_left(15)
+            sage: p
+            LazyGeodesic starting with "3", ending with "12" and with turns "deque([(5, 1)])"
+        """
+        
+        Q = self._quadsystem._quad
+        vp = Q.vertex_permutation(copy=False)
+        fp = Q.face_permutation(copy=False)
+        d = 4 * self._quadsystem._genus
+        if self._first == None:
+            self._first = e
+            self._last = e
+        else:
+            pre = self._first
+            newturn = self._quadsystem.turn(Q._ep(e), pre)
+            
+            if newturn == 0 and not self._turn_sequence: #spur
+                self._first = self._last = None
+            elif newturn == 0: #spur
+                cur = Q._ep(self._first)
+                (t, n) = self._turn_sequence.popleft()
+                if n > 1:
+                    self._turn_sequence.appendleft()
+                for i in range(t):
+                    cur = vp[cur]
+                self._first = cur
+            elif len(self._turn_sequence) >= 1 and newturn == 1 and self._turn_sequence[0][0] == 1: # positive bracket of length one
+                self._turn_sequence.popleft()
+                turn_modif_left(self._turn_sequence, -1, d)
+                self._first = Q.previous_at_vertex(e)
+            elif len(self._turn_sequence) >= 2 and newturn == 1 and self._turn_sequence[0][0] == 2 and self._turn_sequence[1][0] == 1:
+                # positive bracket of length more than one
+                _, n = self._turn_sequence.popleft()
+                self._turn_sequence.popleft()
+                turn_modif_left(self._turn_sequence, -1, d)
+                turn_add_left(self._turn_sequence, d - 2, n)
+                self._first = Q.previous_at_vertex(e)
+            elif len(self._turn_sequence) >= 1 and newturn == d - 1 and self._turn_sequence[0][0] == d - 1: # negative bracket of length one
+                self._turn_sequence.popleft()
+                turn_modif_left(self._turn_sequence, 1, d)
+                self._first = vp[e]
+            elif len(self._turn_sequence) >= 2 and newturn == d - 1 and self._turn_sequence[0][0] == d - 2 and self._turn_sequence[1][0] == d - 1:
+                # negative bracket of length more than one
+                _, n = self._turn_sequence.popleft()
+                self._turn_sequence.popleft()
+                turn_modif_left(self._turn_sequence, 1, d)
+                turn_add_left(self._turn_sequence, 2, n)
+                self._first = vp[e]
+            else:
+                self._first = e
+                turn_add_left(self._turn_sequence, newturn, 1)
