@@ -483,7 +483,7 @@ class OrientedMap:
             edges[(u, v)].append(e)
 
         half_edge_end = [half_edge_start[h ^ 1] for h in range(len(self._vp))]
-        
+
         edge_vertices=[None]*(len(self._vp)//2)
         if subdivide:
             loops = []
@@ -539,9 +539,8 @@ class OrientedMap:
             - ``edge_labels``: boolean specifying whether to plot the labels of the edges.
             - ``edge_colors``: dictionnary specifying the color to assign to each edge color.
             - ``vertex_colors``: dictionnary specifying the color to assign to each vertex color.
-            
+
         """
-        
         G, em, r, edge_list = self.graph(oriented=oriented, subdivide=subdivide, root=root)
         pos = G.layout_planar(on_embedding=em, external_face=r)
         if vertex_colors is None:
@@ -554,7 +553,7 @@ class OrientedMap:
             for c, edges in edge_colors.items():
                 for e in edges:
                     edge_cols[c].extend(edge_list[e][i:i+2] for i in range(len(edge_list[e])-1))
-                
+
         return G.plot(pos=pos, vertex_labels=False, edge_labels=edge_labels, vertex_colors=vertex_colors, edge_colors=edge_cols)
 
     def __eq__(self, other):
@@ -1073,9 +1072,36 @@ class OrientedMap:
             sage: m.vertex_degree(2)
             3
         """
+        if len(self._vp) == 0:
+            return 0
         if check:
             self._check_half_edge(h)
         return perm_orbit_size(self._vp, h)
+
+    def vertex_turn(self, h0, h1):
+        r"""
+        Return the number of turns from h0 to h1 around a vertex
+
+        EXAMPLES:
+
+            sage: from topsurf import OrientedMap
+
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6], [5, 8, 10, 12], [3, 11, 13, 7, 1, 9]])
+            sage: m.vertex_turn(3, 7)
+            3
+        """
+
+        vp = self.vertex_permutation(copy=False)
+        if h0 == h1:
+            return 0
+        current = vp[h0]
+        turn = 1
+        while current != h0 and current != h1:
+            turn += 1
+            current = vp[current]
+        if current == h0:
+            raise ValueError("The half-edge {} does not belong to the same vertex than the half-edge {}.".format(h0, h1))
+        return turn
 
     def face_degree(self, h, check=True):
         r"""
@@ -1089,9 +1115,36 @@ class OrientedMap:
             sage: m.face_degree(2)
             9
         """
+        if len(self._vp) == 0:
+            return 0
         if check:
             self._check_half_edge(h)
         return perm_orbit_size(self._fp, h)
+
+    def face_turn(self, h0, h1):
+        r"""
+        Return the number of turns from h0 to h1 around a face
+
+        EXAMPLES:
+
+            sage: from topsurf import OrientedMap
+
+            sage: m = OrientedMap(vp=[[0, 2, 4, 6], [5, 8, 10, 12], [3, 11, 13, 7, 1, 9]])
+            sage: m.face_turn(0, 8)
+            5
+        """
+
+        fp = self.face_permutation(copy=False)
+        if h0 == h1:
+            return 0
+        current = fp[h0]
+        turn = 1
+        while current != h0 and current != h1:
+            turn += 1
+            current = fp[current]
+        if current == h0:
+            raise ValueError("The half-edge {} does not belong to the same face than the half-edge {}.".format(h0, h1))
+        return turn
 
     def is_connected(self):
         r"""
@@ -1728,7 +1781,7 @@ class OrientedMap:
         elif h1 < 0:
             # edge attached only at h0
             h0_fp_prev = self.previous_in_face(h0)
-            
+
             vp[2 * e + 1] = 2 * e + 1
             vp[2 * e] = vp[h0]
             vp[h0] = 2 * e
@@ -1772,13 +1825,13 @@ class OrientedMap:
         :meth:`add_edge`. See also :meth:`delete_edge`.
 
         EXAMPLES::
-        
+
             sage: from topsurf import OrientedMap
             sage: m = OrientedMap(fp="(0,1,~0,~1)", mutable=True)
             sage: m.insert_edge(0, 1)
             sage: m
             OrientedMap("(0,1,2,~0,~1,~2)", "(0,2,~1)(~0,~2,1)")
-            
+
             sage: G = OrientedMap(vp = [[0, 2], [1, 4], [3, 5]], mutable=True)
             sage: G_dual = G.dual()
             sage: G.add_edge(0, 4)
@@ -1848,7 +1901,7 @@ class OrientedMap:
             vp[2 * e] = self._ep(h0)
             vp[2 * e + 1] = 2 * e
             vp[fp[2 * e]] = 2 * e + 1
-            
+
         elif h0 == h1:
             # insert an edge with a vertex after h0
             fp[2 * e] = 2 * e + 1
@@ -2615,7 +2668,7 @@ class OrientedMap:
 
     def dual(self, mutable=None, check=True):
         r"""
-        Return the dual map of self. 
+        Return the dual map of self.
 
         EXAMPLES::
 
@@ -2625,7 +2678,7 @@ class OrientedMap:
             OrientedMap("(0,~0,1,~1)", "(0)(~0,~1)(1)")
             sage: G.dual()
             OrientedMap("(0,1)(~0)(~1)", "(0,~0,1,~1)")
-            
+
             sage: H = OrientedMap(vp=[[0,2,1,3]])
             sage: H.dual()
             OrientedMap("(0,1,~0,~1)", "(0,1,~0,~1)")
@@ -2639,7 +2692,7 @@ class OrientedMap:
             OrientedMap("(0,1,~0)", "(0,1)(~0)")
 
         Applying four times the dual function return the same map (with same labels)::
-        
+
             sage: G0 = OrientedMap(vp=[[0,1,2,3]])
             sage: G1 = G0.dual()
             sage: G2 = G1.dual()
@@ -2680,7 +2733,6 @@ class OrientedMap:
             sage: J
             OrientedMap("(1)(~1)", "(1,~1)")
         """
-        
         if check:
             self._assert_mutable()
             self._check_half_edge(h)
@@ -2699,7 +2751,7 @@ class OrientedMap:
         oh1 = self._ep(h1)
         oh2 = self._ep(h2)
         oh3 = self._ep(h3)
-        
+
         self._vp[h] = self._vp[oh3] if self._vp[oh3] != oh3 else h
         self._vp[h1] = self._vp[oh2] if self._vp[oh2] != oh2 else h1
         if h3 != oh:
@@ -2710,7 +2762,7 @@ class OrientedMap:
         self._vp[oh2] = -1
         self._vp[h2] = -1
         self._vp[h3] = -1
-        
+
         self._fp[oh] = self._fp[h3]
         self._fp[oh1] = self._fp[h2]
         self._fp[self._ep(self._vp[h])] = h
@@ -2722,7 +2774,7 @@ class OrientedMap:
 
         remove_trailing_minus_ones(self._fp)
         remove_trailing_minus_ones(self._vp)
-        
+
     def disjoint_union(self, *others, check=True):
         r"""
         Add a copy of others in self. The labels of the half edges of others will be shifted by the sizes of the previous maps.
@@ -2743,14 +2795,14 @@ class OrientedMap:
             self._check()
             for m in others:
                 m._check()
-        
+
         for m in others:
             n = len(self._vp)
             for h in range(len(m._vp)):
                 self._vp.append(m._vp[h]+n)
                 self._fp.append(m._fp[h]+n)
 
-    
+
     def merge_vertices(self, *corners, check=True):
         r"""
         Merges the corners in corners.
@@ -2828,10 +2880,8 @@ class OrientedMap:
             self._fp[oh] = h
         self._fp[self._ep(self._vp[h])] = h 
         self._fp[self._ep(self._vp[pre_h])] = pre_h
-            
-            
 
-        
+
 
 # - relabel: keep combinatorics but change labellings
 # - slide or half_edge_slide (possibly flip as a shortcut)
@@ -2842,4 +2892,4 @@ class OrientedMap:
 # - add_edge(h1, h2=None, h=None): if h2=None => folded and h1=h2 => loop (h is the new name)
 # - glue(h1, h2)
 # - union(m1, m2, m3, ...): disjoint union
- 
+

@@ -388,18 +388,25 @@ class ColoredOrientedMap(OrientedMap):
             self._assert_mutable()
             h = self._check_half_edge(h)
             c = self._check_half_edge_or_negative(c)
+
+        if h == c:
+            return None 
         
         nh = None
         if h == self._v_id(h):
-            nh = self.next_at_vertex(h)
-            colh = self.vertex_color(h)
+            if self.next_at_vertex(h) == h:
+                self._vertex_colors.pop(h)
+            else :
+                nh = self.next_at_vertex(h)
+                colh = self.vertex_color(h)
         recycle = True
         if c < 0:
             self._vertex_colors[h] = v_color
             recycle = False
         elif h < self._v_id(c):
             self._vertex_colors[h] = self.vertex_color(c)
-            self._vertex_colors.pop(self._v_id(c))
+            if h != self._v_id(c):
+                self._vertex_colors.pop(self._v_id(c))
             recycle = False
             
         OrientedMap.move_half_edge(self, h, c, check=check)
@@ -477,7 +484,20 @@ class ColoredOrientedMap(OrientedMap):
         self._vertex_colors[new_id] = new_color
         OrientedMap.merge_vertices(self, *corners, check=False)
 
-
+    def swap_color(self, c0=0, c1=1, check=True):
+        r"""
+        Swap colors c0 and c1 in m.
+        """
+    
+        if check:
+            self._assert_mutable()
+            self._check()
+    
+        for v, c in self._vertex_colors.items():
+            if c == c0:
+                self._vertex_colors[v]=c1
+            elif c == c1:
+                self._vertex_colors[v]=c0
     
     
 
