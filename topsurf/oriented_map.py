@@ -2866,6 +2866,30 @@ class OrientedMap:
         self._fp[self._ep(self._vp[pre_h])] = pre_h
 
 
+    def turn_around_vertex(self, h0, h1):
+        r"""
+        Compute the number of turn from dart h0 to dart h1 around a vertex.
+
+        EXAMPLES::
+
+            sage: from topsurf import OrientedMap
+            sage: m = OrientedMap(vp=[[0,1,2], [3]])
+            sage: m.turn_around_vertex(0, 2)
+            2
+        """
+        vp = self.vertex_permutation(copy=False)
+        current = h0
+        if h1 == h0:
+            return 0
+        else:
+            current = vp[h0]
+        turn = 1
+        while current != h0 and h1 != current:
+            turn += 1
+            current = vp[current]
+        if current == h0:
+            raise ValueError("The half-edge {} is not on the same vertex as the half-edge {}.".format(f,e))
+        return turn
 
 # - relabel: keep combinatorics but change labellings
 # - slide or half_edge_slide (possibly flip as a shortcut)
