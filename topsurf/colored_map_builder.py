@@ -45,10 +45,10 @@ def bridge_3col(m1, m2, r1=None, r2=None, check=True):
     n1 = len(m1._vp)
     n2 = len(m2._vp)
     if n2 == 0:
-        m1.add_edge(r1, -1, v1_color=1)
+        m1.add_edge(r1, -1, v0_color=0, v1_color=1)
     else:
         m1.disjoint_union(m2, check=False)
-        m1.add_edge(r1, m1._fp[n1+r2])
+        m1.add_edge(r1, m1._fp[n1+r2], v0_color=0)
 
     return m1
     
